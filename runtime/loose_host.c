@@ -48,3 +48,9 @@ __attribute__((constructor)) static void loose_host_start(void) {
     HANDLE h = CreateThread(NULL, 0, loose_host_wait, NULL, 0, NULL);
     if (h) CloseHandle(h);
 }
+
+/* runtime/recomp_menu.c: which "@<name>" folders are active, and a look at each served file */
+void loose_host_callbacks(int (*condition)(const char *), void (*served)(const char *, uint8_t *, uint32_t)) {
+    g_lf_condition = condition;
+    g_lf_served = served;
+}

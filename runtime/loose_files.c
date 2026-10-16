@@ -88,6 +88,8 @@ typedef struct {
     int is_new;                     // stage 2: the row was added by us
     uint64_t donor_hash;            // stage 2: the archive file whose data rows the new row shares
     uint64_t name_hash;             // B3: hash40 of the file NAME when the folder file is named "0x<name hash>.<ext>", else 0
+    const char *folder;             // the folder directly under <root> it came from
+    int conditional;                // folder named "@<name>": served only while g_lf_condition(<name>) answers 1
 } LooseFile;
 typedef struct { char name[32], donor[32]; int files, new_files, renamed, private_rows, shared_rows; long served, donor_bytes_files; unsigned long long bytes; } LooseOwner;
 typedef struct { uint64_t hash, parent_hash, name_hash, donor_hash; int owner, exists; uint32_t fpos, ipos; } LooseFolder;
@@ -111,6 +113,11 @@ static int g_lf_search_on, g_lf_early;
 static struct { uint32_t itd, data_index, size, info; } g_lf_tmpl[LF_MAX_TMPL];      // N8: files made from a group's template
 static int g_lf_virtual;            // N10: SSBU_LOOSE_TEMPLATE=3: such files are VIRTUAL records (no bytes of the archive)
 static uint64_t g_ls_fidx, g_ls_flist; static uint32_t g_ls_nfold;          // the archive's own search folder tables (before the growth)
+static const char *g_lf_cur_folder;          // the folder directly under <root> being scanned (lf_scan)
+// set by the includer (runtime/recomp_menu.c): when a conditional folder is active, and a look at every file served
+// (it may change the bytes in place: the buffer holds `size` bytes)
+static int (*g_lf_condition)(const char *name);
+static void (*g_lf_served)(const char *arc_path, uint8_t *buf, uint32_t size);
 static void (*g_lf_log)(const char *);
 static HookOrig g_lf_orig_inflate;
 static CRITICAL_SECTION g_lf_lock;
@@ -290,6 +297,7 @@ static void lf_scan(const char *dir, const char *rel, int owner) {
             f->donor_hash = strcmp(dp, r) ? lf_path_hash(dp) : 0;      /* B3: a "0x<name hash>" name joined to its folder */
             g_lf_owner[owner].files++;
         }
+        f->folder = g_lf_cur_folder; f->conditional = g_lf_cur_folder[0] == '@';
     } while (FindNextFileA(h, &fd));
     FindClose(h);
 }
@@ -1335,6 +1343,7 @@ static void lf_serve(uint64_t fsinfo, uint32_t info_index, int raw) {
     for (int k = 0; k < g_lf_count; k++) {
         LooseFile *f = &g_lf[k];
         if (f->path_index < 0 || f->info_index != info_index) continue;
+        if (f->conditional && !(g_lf_condition && g_lf_condition(f->folder + 1))) continue;
         if (raw == 1 && ++g_lf_served_raw <= 3)
             lf_logf("[loose] %s: stored UNCOMPRESSED in the archive: served at the load thread's raw copy (file info 0x%x)", f->arc_path, info_index);
         uint64_t datas = lf_r64(fsinfo + 0x10);
@@ -1345,6 +1354,7 @@ static void lf_serve(uint64_t fsinfo, uint32_t info_index, int raw) {
         size_t got = fread((void *)(uintptr_t)buf, 1, f->size, fp);
         fclose(fp);
         f->served++;
+        if (g_lf_served) g_lf_served(f->arc_path, (uint8_t *)(uintptr_t)buf, (uint32_t)got);
         {   /* N10: (1) a texture file ends with a fixed footer that its reader takes from the END of the buffer: when the
              * folder's texture is SMALLER than the buffer (the size in the file-data row: the donor file's), the footer
              * is copied to the buffer's end too (what reference\ARCropolis does in handle_file_replace: 0xb0 bytes).
@@ -1440,6 +1450,7 @@ static int loose_files_scan(void (*log)(const char *)) {
                     if (lf_json_str(js, "donor", o->donor, sizeof o->donor)) owner = g_lf_owner_count++;
                 }
             }
+            g_lf_cur_folder = _strdup(fd.cFileName);
             lf_scan(sub, "", owner);
             if (owner >= 0) lf_clone_list(sub, owner, before);
             lf_logf("[loose] folder %s: %d files%s", sub, g_lf_count - before, owner >= 0 ? " (a fighter's folder: its manifest names the donor)" : "");
