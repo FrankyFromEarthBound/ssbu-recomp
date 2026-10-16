@@ -13,105 +13,150 @@ only says where to look. Addresses are of 13.0.4.
 | `710007ea1c` (in f_710007e110) |  | [runtime/nnfontll.c:31](../../runtime/nnfontll.c#L31) |
 | `710007ffd0` (in f_710007f870) |  | [runtime/nnfontll.c:44](../../runtime/nnfontll.c#L44) |
 | `7100249cd0` |  | [runtime/nnsvc_c5a.inc:29](../../runtime/nnsvc_c5a.inc#L29) |
-| `71002ab9fc` (in f_71002ab970) |  | [runtime/nnapplet.c:125](../../runtime/nnapplet.c#L125) |
-| `71002c5cf0` |  | [mods/mods_n5_src/n5_kind.cpp:350](../../mods/mods_n5_src/n5_kind.cpp#L350) |
-| `71002c9900` |  | [mods/mods_n5_src/n5_kind.cpp:350](../../mods/mods_n5_src/n5_kind.cpp#L350) |
+| `71002ab9fc` (in f_71002ab970) |  | [runtime/nnapplet.c:122](../../runtime/nnapplet.c#L122) |
+| `71002c5cf0` |  | [mods/mods_n12_src/n12_kind.cpp:1345](../../mods/mods_n12_src/n12_kind.cpp#L1345), [mods/mods_n5_src/n5_kind.cpp:450](../../mods/mods_n5_src/n5_kind.cpp#L450), [mods/mods_n6_src/n6_kind.cpp:558](../../mods/mods_n6_src/n6_kind.cpp#L558), [mods/mods_n7_src/n7_kind.cpp:638](../../mods/mods_n7_src/n7_kind.cpp#L638), [mods/mods_n8_src/n8_kind.cpp:682](../../mods/mods_n8_src/n8_kind.cpp#L682) |
+| `71002c9900` |  | [mods/mods_n12_src/n12_kind.cpp:1345](../../mods/mods_n12_src/n12_kind.cpp#L1345), [mods/mods_n5_src/n5_kind.cpp:450](../../mods/mods_n5_src/n5_kind.cpp#L450), [mods/mods_n6_src/n6_kind.cpp:558](../../mods/mods_n6_src/n6_kind.cpp#L558), [mods/mods_n7_src/n7_kind.cpp:638](../../mods/mods_n7_src/n7_kind.cpp#L638), [mods/mods_n8_src/n8_kind.cpp:682](../../mods/mods_n8_src/n8_kind.cpp#L682) |
 | `7100331db8` (in f_7100330390) |  | [tools/lifter/patches/kinds_scan.py:24](../../tools/lifter/patches/kinds_scan.py#L24) |
-| `710033ba50` |  | [mods/mods_n3_src/n3_kind.cpp:17](../../mods/mods_n3_src/n3_kind.cpp#L17), [mods/mods_n3_src/n3_kind.cpp:80](../../mods/mods_n3_src/n3_kind.cpp#L80), [mods/mods_n4_src/n4_kind.cpp:123](../../mods/mods_n4_src/n4_kind.cpp#L123), [mods/mods_n5_src/n5_kind.cpp:130](../../mods/mods_n5_src/n5_kind.cpp#L130) |
-| `710033c510` |  | [mods/mods_n3_src/n3_kind.cpp:17](../../mods/mods_n3_src/n3_kind.cpp#L17), [mods/mods_n3_src/n3_kind.cpp:80](../../mods/mods_n3_src/n3_kind.cpp#L80), [mods/mods_n4_src/n4_kind.cpp:123](../../mods/mods_n4_src/n4_kind.cpp#L123), [mods/mods_n5_src/n5_kind.cpp:130](../../mods/mods_n5_src/n5_kind.cpp#L130) |
-| `710034b310` |  | [mods/mods_n5_src/n5_kind.cpp:351](../../mods/mods_n5_src/n5_kind.cpp#L351) |
-| `7100351630` |  | [mods/mods_n5_src/n5_kind.cpp:351](../../mods/mods_n5_src/n5_kind.cpp#L351) |
-| `710035fc50` |  | [mods/mods_n5_src/n5_kind.cpp:351](../../mods/mods_n5_src/n5_kind.cpp#L351) |
-| `7100362df0` | `app::ai_param::param_float(lua_State*, phx::Hash40)` | [mods/mods_n5_src/n5_kind.cpp:352](../../mods/mods_n5_src/n5_kind.cpp#L352) |
-| `710036c1c0` | `app::ai_param::param_int(lua_State*, phx::Hash40)` | [mods/mods_n5_src/n5_kind.cpp:352](../../mods/mods_n5_src/n5_kind.cpp#L352) |
-| `71003719c0` |  | [mods/mods_n5_src/n5_kind.cpp:352](../../mods/mods_n5_src/n5_kind.cpp#L352) |
-| `7100607b2c` (in f_71006079d0) |  | [mods/mods_n4_src/n4_kind.cpp:144](../../mods/mods_n4_src/n4_kind.cpp#L144), [mods/mods_n5_src/n5_kind.cpp:161](../../mods/mods_n5_src/n5_kind.cpp#L161) |
-| `710064b730` |  | [mods/mods_n3_src/n3_kind.cpp:13](../../mods/mods_n3_src/n3_kind.cpp#L13) |
+| `710033ba50` |  | [mods/mods_n12_src/n12_kind.cpp:478](../../mods/mods_n12_src/n12_kind.cpp#L478), [mods/mods_n3_src/n3_kind.cpp:17](../../mods/mods_n3_src/n3_kind.cpp#L17), [mods/mods_n3_src/n3_kind.cpp:80](../../mods/mods_n3_src/n3_kind.cpp#L80), [mods/mods_n4_src/n4_kind.cpp:123](../../mods/mods_n4_src/n4_kind.cpp#L123), [mods/mods_n5_src/n5_kind.cpp:141](../../mods/mods_n5_src/n5_kind.cpp#L141), [mods/mods_n6_src/n6_kind.cpp:234](../../mods/mods_n6_src/n6_kind.cpp#L234) and 2 more |
+| `710033c510` |  | [mods/mods_n12_src/n12_kind.cpp:478](../../mods/mods_n12_src/n12_kind.cpp#L478), [mods/mods_n3_src/n3_kind.cpp:17](../../mods/mods_n3_src/n3_kind.cpp#L17), [mods/mods_n3_src/n3_kind.cpp:80](../../mods/mods_n3_src/n3_kind.cpp#L80), [mods/mods_n4_src/n4_kind.cpp:123](../../mods/mods_n4_src/n4_kind.cpp#L123), [mods/mods_n5_src/n5_kind.cpp:141](../../mods/mods_n5_src/n5_kind.cpp#L141), [mods/mods_n6_src/n6_kind.cpp:234](../../mods/mods_n6_src/n6_kind.cpp#L234) and 2 more |
+| `710034b310` |  | [mods/mods_n12_src/n12_kind.cpp:1346](../../mods/mods_n12_src/n12_kind.cpp#L1346), [mods/mods_n5_src/n5_kind.cpp:451](../../mods/mods_n5_src/n5_kind.cpp#L451), [mods/mods_n6_src/n6_kind.cpp:559](../../mods/mods_n6_src/n6_kind.cpp#L559), [mods/mods_n7_src/n7_kind.cpp:639](../../mods/mods_n7_src/n7_kind.cpp#L639), [mods/mods_n8_src/n8_kind.cpp:683](../../mods/mods_n8_src/n8_kind.cpp#L683) |
+| `7100351630` |  | [mods/mods_n12_src/n12_kind.cpp:1346](../../mods/mods_n12_src/n12_kind.cpp#L1346), [mods/mods_n5_src/n5_kind.cpp:451](../../mods/mods_n5_src/n5_kind.cpp#L451), [mods/mods_n6_src/n6_kind.cpp:559](../../mods/mods_n6_src/n6_kind.cpp#L559), [mods/mods_n7_src/n7_kind.cpp:639](../../mods/mods_n7_src/n7_kind.cpp#L639), [mods/mods_n8_src/n8_kind.cpp:683](../../mods/mods_n8_src/n8_kind.cpp#L683) |
+| `710035fc50` |  | [mods/mods_n12_src/n12_kind.cpp:1346](../../mods/mods_n12_src/n12_kind.cpp#L1346), [mods/mods_n5_src/n5_kind.cpp:451](../../mods/mods_n5_src/n5_kind.cpp#L451), [mods/mods_n6_src/n6_kind.cpp:559](../../mods/mods_n6_src/n6_kind.cpp#L559), [mods/mods_n7_src/n7_kind.cpp:639](../../mods/mods_n7_src/n7_kind.cpp#L639), [mods/mods_n8_src/n8_kind.cpp:683](../../mods/mods_n8_src/n8_kind.cpp#L683) |
+| `7100362df0` | `app::ai_param::param_float(lua_State*, phx::Hash40)` | [mods/mods_n12_src/n12_kind.cpp:1347](../../mods/mods_n12_src/n12_kind.cpp#L1347), [mods/mods_n5_src/n5_kind.cpp:452](../../mods/mods_n5_src/n5_kind.cpp#L452), [mods/mods_n6_src/n6_kind.cpp:560](../../mods/mods_n6_src/n6_kind.cpp#L560), [mods/mods_n7_src/n7_kind.cpp:640](../../mods/mods_n7_src/n7_kind.cpp#L640), [mods/mods_n8_src/n8_kind.cpp:684](../../mods/mods_n8_src/n8_kind.cpp#L684) |
+| `710036c1c0` | `app::ai_param::param_int(lua_State*, phx::Hash40)` | [mods/mods_n12_src/n12_kind.cpp:1347](../../mods/mods_n12_src/n12_kind.cpp#L1347), [mods/mods_n5_src/n5_kind.cpp:452](../../mods/mods_n5_src/n5_kind.cpp#L452), [mods/mods_n6_src/n6_kind.cpp:560](../../mods/mods_n6_src/n6_kind.cpp#L560), [mods/mods_n7_src/n7_kind.cpp:640](../../mods/mods_n7_src/n7_kind.cpp#L640), [mods/mods_n8_src/n8_kind.cpp:684](../../mods/mods_n8_src/n8_kind.cpp#L684) |
+| `71003719c0` |  | [mods/mods_n12_src/n12_kind.cpp:1347](../../mods/mods_n12_src/n12_kind.cpp#L1347), [mods/mods_n5_src/n5_kind.cpp:452](../../mods/mods_n5_src/n5_kind.cpp#L452), [mods/mods_n6_src/n6_kind.cpp:560](../../mods/mods_n6_src/n6_kind.cpp#L560), [mods/mods_n7_src/n7_kind.cpp:640](../../mods/mods_n7_src/n7_kind.cpp#L640), [mods/mods_n8_src/n8_kind.cpp:684](../../mods/mods_n8_src/n8_kind.cpp#L684) |
+| `7100491e00` |  | [runtime/loose_files.c:602](../../runtime/loose_files.c#L602) |
+| `71004c5780` |  | [mods/mods_n12_src/n12_kind.cpp:436](../../mods/mods_n12_src/n12_kind.cpp#L436), [mods/mods_n6_src/n6_kind.cpp:201](../../mods/mods_n6_src/n6_kind.cpp#L201), [mods/mods_n7_src/n7_kind.cpp:265](../../mods/mods_n7_src/n7_kind.cpp#L265), [mods/mods_n8_src/n8_kind.cpp:296](../../mods/mods_n8_src/n8_kind.cpp#L296) |
+| `71004c6b20` |  | [mods/mods_n12_src/n12_kind.cpp:404](../../mods/mods_n12_src/n12_kind.cpp#L404), [mods/mods_n6_src/n6_kind.cpp:189](../../mods/mods_n6_src/n6_kind.cpp#L189), [mods/mods_n7_src/n7_kind.cpp:253](../../mods/mods_n7_src/n7_kind.cpp#L253), [mods/mods_n8_src/n8_kind.cpp:284](../../mods/mods_n8_src/n8_kind.cpp#L284) |
+| `7100607b2c` (in f_71006079d0) |  | [mods/mods_n12_src/n12_kind.cpp:640](../../mods/mods_n12_src/n12_kind.cpp#L640), [mods/mods_n4_src/n4_kind.cpp:144](../../mods/mods_n4_src/n4_kind.cpp#L144), [mods/mods_n5_src/n5_kind.cpp:246](../../mods/mods_n5_src/n5_kind.cpp#L246), [mods/mods_n6_src/n6_kind.cpp:341](../../mods/mods_n6_src/n6_kind.cpp#L341), [mods/mods_n7_src/n7_kind.cpp:405](../../mods/mods_n7_src/n7_kind.cpp#L405), [mods/mods_n8_src/n8_kind.cpp:445](../../mods/mods_n8_src/n8_kind.cpp#L445) |
+| `710060b6b0` |  | [mods/mods_n12_src/n12_kind.cpp:1437](../../mods/mods_n12_src/n12_kind.cpp#L1437) |
+| `710064b730` |  | [fighter_sdk/tools/new_fighter.py:234](../../fighter_sdk/tools/new_fighter.py#L234), [mods/mods_n12_src/n12_kind.cpp:192](../../mods/mods_n12_src/n12_kind.cpp#L192), [mods/mods_n3_src/n3_kind.cpp:13](../../mods/mods_n3_src/n3_kind.cpp#L13) |
 | `710064bbd0` |  | [mods/mods_n3_src/n3_kind.cpp:15](../../mods/mods_n3_src/n3_kind.cpp#L15) |
 | `710064eec0` |  | [mods/mods_n3_src/n3_kind.cpp:15](../../mods/mods_n3_src/n3_kind.cpp#L15) |
 | `7100653240` |  | [tests/DEBUG_MODE.md:87](../../tests/DEBUG_MODE.md#L87) |
-| `71006542d0` |  | [tests/DEBUG_MODE.md:150](../../tests/DEBUG_MODE.md#L150) |
+| `71006542d0` |  | [tests/DEBUG_MODE.md:153](../../tests/DEBUG_MODE.md#L153) |
 | `710066cd40` |  | [mods/mods_n3_src/n3_kind.cpp:12](../../mods/mods_n3_src/n3_kind.cpp#L12) |
 | `710066ee40` |  | [mods/mods_n3_src/n3_kind.cpp:118](../../mods/mods_n3_src/n3_kind.cpp#L118), [tools/lifter/patches/kinds_scan.py:158](../../tools/lifter/patches/kinds_scan.py#L158), [tools/lifter/patches/kinds_scan.py:179](../../tools/lifter/patches/kinds_scan.py#L179), [tools/lifter/patches/kinds_scan.py:21](../../tools/lifter/patches/kinds_scan.py#L21), [tools/lifter/patches/kinds_scan.py:42](../../tools/lifter/patches/kinds_scan.py#L42) |
 | `710066f37c` (in f_710066ee40) |  | [tools/lifter/patches/kinds_scan.py:184](../../tools/lifter/patches/kinds_scan.py#L184) |
 | `710066f970` (in f_710066ee40) |  | [tools/lifter/patches/kinds_scan.py:184](../../tools/lifter/patches/kinds_scan.py#L184) |
-| `71006867e0` |  | [mods/mods_n3_src/n3_kind.cpp:136](../../mods/mods_n3_src/n3_kind.cpp#L136), [mods/mods_n3_src/n3_kind.cpp:19](../../mods/mods_n3_src/n3_kind.cpp#L19), [mods/mods_n4_src/n4_kind.cpp:265](../../mods/mods_n4_src/n4_kind.cpp#L265), [mods/mods_n5_src/n5_kind.cpp:282](../../mods/mods_n5_src/n5_kind.cpp#L282) |
+| `71006867e0` |  | [mods/mods_n12_src/n12_kind.cpp:879](../../mods/mods_n12_src/n12_kind.cpp#L879), [mods/mods_n3_src/n3_kind.cpp:136](../../mods/mods_n3_src/n3_kind.cpp#L136), [mods/mods_n3_src/n3_kind.cpp:19](../../mods/mods_n3_src/n3_kind.cpp#L19), [mods/mods_n4_src/n4_kind.cpp:265](../../mods/mods_n4_src/n4_kind.cpp#L265), [mods/mods_n5_src/n5_kind.cpp:369](../../mods/mods_n5_src/n5_kind.cpp#L369), [mods/mods_n6_src/n6_kind.cpp:477](../../mods/mods_n6_src/n6_kind.cpp#L477) and 2 more |
 | `710068d530` |  | [mods/mods_n3_src/n3_kind.cpp:14](../../mods/mods_n3_src/n3_kind.cpp#L14), [tools/lifter/patches/kinds_scan.py:130](../../tools/lifter/patches/kinds_scan.py#L130) |
+| `71006cdd20` |  | [mods/mods_n12_src/n12_kind.cpp:400](../../mods/mods_n12_src/n12_kind.cpp#L400), [mods/mods_n12_src/n12_kind.cpp:406](../../mods/mods_n12_src/n12_kind.cpp#L406), [mods/mods_n6_src/n6_kind.cpp:185](../../mods/mods_n6_src/n6_kind.cpp#L185), [mods/mods_n6_src/n6_kind.cpp:191](../../mods/mods_n6_src/n6_kind.cpp#L191), [mods/mods_n7_src/n7_kind.cpp:249](../../mods/mods_n7_src/n7_kind.cpp#L249), [mods/mods_n7_src/n7_kind.cpp:255](../../mods/mods_n7_src/n7_kind.cpp#L255) and 2 more |
 | `71006deca0` |  | [tools/lifter/patches/kinds_scan.py:189](../../tools/lifter/patches/kinds_scan.py#L189) |
 | `71006df660` |  | [tools/lifter/patches/kinds_scan.py:189](../../tools/lifter/patches/kinds_scan.py#L189) |
 | `71006e4eb0` |  | [tools/lifter/patches/kinds_scan.py:189](../../tools/lifter/patches/kinds_scan.py#L189) |
 | `7100709a80` |  | [tools/lifter/patches/kinds_scan.py:22](../../tools/lifter/patches/kinds_scan.py#L22), [tools/lifter/patches/kinds_scan.py:42](../../tools/lifter/patches/kinds_scan.py#L42) |
 | `7100709d60` |  | [mods/mods_n3_src/n3_kind.cpp:18](../../mods/mods_n3_src/n3_kind.cpp#L18), [tools/lifter/patches/kinds_scan.py:22](../../tools/lifter/patches/kinds_scan.py#L22), [tools/lifter/patches/kinds_scan.py:42](../../tools/lifter/patches/kinds_scan.py#L42) |
-| `710070a464` (in f_7100709d60) |  | [mods/mods_n4_src/n4_kind.cpp:167](../../mods/mods_n4_src/n4_kind.cpp#L167), [mods/mods_n5_src/n5_kind.cpp:184](../../mods/mods_n5_src/n5_kind.cpp#L184) |
-| `710070a540` (in f_7100709d60) |  | [mods/mods_n4_src/n4_kind.cpp:167](../../mods/mods_n4_src/n4_kind.cpp#L167), [mods/mods_n5_src/n5_kind.cpp:184](../../mods/mods_n5_src/n5_kind.cpp#L184) |
+| `710070a464` (in f_7100709d60) |  | [mods/mods_n12_src/n12_kind.cpp:689](../../mods/mods_n12_src/n12_kind.cpp#L689), [mods/mods_n4_src/n4_kind.cpp:167](../../mods/mods_n4_src/n4_kind.cpp#L167), [mods/mods_n5_src/n5_kind.cpp:271](../../mods/mods_n5_src/n5_kind.cpp#L271), [mods/mods_n6_src/n6_kind.cpp:368](../../mods/mods_n6_src/n6_kind.cpp#L368), [mods/mods_n7_src/n7_kind.cpp:432](../../mods/mods_n7_src/n7_kind.cpp#L432), [mods/mods_n8_src/n8_kind.cpp:472](../../mods/mods_n8_src/n8_kind.cpp#L472) |
+| `710070a540` (in f_7100709d60) |  | [mods/mods_n12_src/n12_kind.cpp:689](../../mods/mods_n12_src/n12_kind.cpp#L689), [mods/mods_n4_src/n4_kind.cpp:167](../../mods/mods_n4_src/n4_kind.cpp#L167), [mods/mods_n5_src/n5_kind.cpp:271](../../mods/mods_n5_src/n5_kind.cpp#L271), [mods/mods_n6_src/n6_kind.cpp:368](../../mods/mods_n6_src/n6_kind.cpp#L368), [mods/mods_n7_src/n7_kind.cpp:432](../../mods/mods_n7_src/n7_kind.cpp#L432), [mods/mods_n8_src/n8_kind.cpp:472](../../mods/mods_n8_src/n8_kind.cpp#L472) |
 | `710070a548` (in f_7100709d60) |  | [tools/lifter/patches/kinds_scan.py:23](../../tools/lifter/patches/kinds_scan.py#L23) |
 | `710070c340` |  | [tools/lifter/patches/kinds_scan.py:22](../../tools/lifter/patches/kinds_scan.py#L22), [tools/lifter/patches/kinds_scan.py:42](../../tools/lifter/patches/kinds_scan.py#L42) |
 | `710070c580` |  | [mods/mods_n3_src/n3_kind.cpp:16](../../mods/mods_n3_src/n3_kind.cpp#L16) |
-| `7100720f90` |  | [mods/mods_n4_src/n4_kind.cpp:218](../../mods/mods_n4_src/n4_kind.cpp#L218), [mods/mods_n5_src/n5_kind.cpp:235](../../mods/mods_n5_src/n5_kind.cpp#L235) |
+| `7100720f90` |  | [mods/mods_n12_src/n12_kind.cpp:809](../../mods/mods_n12_src/n12_kind.cpp#L809), [mods/mods_n4_src/n4_kind.cpp:218](../../mods/mods_n4_src/n4_kind.cpp#L218), [mods/mods_n5_src/n5_kind.cpp:322](../../mods/mods_n5_src/n5_kind.cpp#L322), [mods/mods_n6_src/n6_kind.cpp:427](../../mods/mods_n6_src/n6_kind.cpp#L427), [mods/mods_n7_src/n7_kind.cpp:491](../../mods/mods_n7_src/n7_kind.cpp#L491), [mods/mods_n8_src/n8_kind.cpp:531](../../mods/mods_n8_src/n8_kind.cpp#L531) |
 | `7100721ca0` |  | [mods/mods_n3_src/n3_kind.cpp:16](../../mods/mods_n3_src/n3_kind.cpp#L16) |
 | `7100730000` (in f_710072d300) |  | [tools/lifter/patches/kinds_scan.py:141](../../tools/lifter/patches/kinds_scan.py#L141) |
-| `7100cb9620` |  | [mods/mods_n4_src/n4_kind.cpp:141](../../mods/mods_n4_src/n4_kind.cpp#L141), [mods/mods_n5_src/n5_kind.cpp:158](../../mods/mods_n5_src/n5_kind.cpp#L158) |
-| `7100cb9de0` |  | [mods/mods_n4_src/n4_kind.cpp:17](../../mods/mods_n4_src/n4_kind.cpp#L17), [mods/mods_n5_src/n5_kind.cpp:17](../../mods/mods_n5_src/n5_kind.cpp#L17) |
+| `7100c280f0` |  | [mods/mods_n12_src/n12_kind.cpp:329](../../mods/mods_n12_src/n12_kind.cpp#L329), [mods/mods_n12_src/n12_kind.cpp:354](../../mods/mods_n12_src/n12_kind.cpp#L354), [mods/mods_n12_src/n12_kind.cpp:451](../../mods/mods_n12_src/n12_kind.cpp#L451), [mods/mods_n6_src/n6_kind.cpp:216](../../mods/mods_n6_src/n6_kind.cpp#L216), [mods/mods_n7_src/n7_kind.cpp:280](../../mods/mods_n7_src/n7_kind.cpp#L280), [mods/mods_n8_src/n8_kind.cpp:209](../../mods/mods_n8_src/n8_kind.cpp#L209) and 2 more |
+| `7100c28164` (in f_7100c280f0) |  | [mods/mods_n12_src/n12_kind.cpp:453](../../mods/mods_n12_src/n12_kind.cpp#L453), [mods/mods_n6_src/n6_kind.cpp:218](../../mods/mods_n6_src/n6_kind.cpp#L218), [mods/mods_n7_src/n7_kind.cpp:282](../../mods/mods_n7_src/n7_kind.cpp#L282), [mods/mods_n8_src/n8_kind.cpp:313](../../mods/mods_n8_src/n8_kind.cpp#L313) |
+| `7100c28178` (in f_7100c280f0) |  | [mods/mods_n12_src/n12_kind.cpp:453](../../mods/mods_n12_src/n12_kind.cpp#L453), [mods/mods_n6_src/n6_kind.cpp:218](../../mods/mods_n6_src/n6_kind.cpp#L218), [mods/mods_n7_src/n7_kind.cpp:282](../../mods/mods_n7_src/n7_kind.cpp#L282), [mods/mods_n8_src/n8_kind.cpp:313](../../mods/mods_n8_src/n8_kind.cpp#L313) |
+| `7100c28230` (in f_7100c280f0) |  | [mods/mods_n12_src/n12_kind.cpp:453](../../mods/mods_n12_src/n12_kind.cpp#L453), [mods/mods_n6_src/n6_kind.cpp:218](../../mods/mods_n6_src/n6_kind.cpp#L218), [mods/mods_n7_src/n7_kind.cpp:282](../../mods/mods_n7_src/n7_kind.cpp#L282), [mods/mods_n8_src/n8_kind.cpp:313](../../mods/mods_n8_src/n8_kind.cpp#L313) |
+| `7100c28280` |  | [mods/mods_n12_src/n12_kind.cpp:403](../../mods/mods_n12_src/n12_kind.cpp#L403), [mods/mods_n12_src/n12_kind.cpp:453](../../mods/mods_n12_src/n12_kind.cpp#L453), [mods/mods_n6_src/n6_kind.cpp:188](../../mods/mods_n6_src/n6_kind.cpp#L188), [mods/mods_n6_src/n6_kind.cpp:218](../../mods/mods_n6_src/n6_kind.cpp#L218), [mods/mods_n7_src/n7_kind.cpp:252](../../mods/mods_n7_src/n7_kind.cpp#L252), [mods/mods_n7_src/n7_kind.cpp:282](../../mods/mods_n7_src/n7_kind.cpp#L282) and 2 more |
+| `7100c282ac` (in f_7100c28280) |  | [mods/mods_n12_src/n12_kind.cpp:404](../../mods/mods_n12_src/n12_kind.cpp#L404), [mods/mods_n6_src/n6_kind.cpp:189](../../mods/mods_n6_src/n6_kind.cpp#L189), [mods/mods_n7_src/n7_kind.cpp:253](../../mods/mods_n7_src/n7_kind.cpp#L253), [mods/mods_n8_src/n8_kind.cpp:284](../../mods/mods_n8_src/n8_kind.cpp#L284) |
+| `7100cb9620` |  | [mods/mods_n12_src/n12_kind.cpp:637](../../mods/mods_n12_src/n12_kind.cpp#L637), [mods/mods_n4_src/n4_kind.cpp:141](../../mods/mods_n4_src/n4_kind.cpp#L141), [mods/mods_n5_src/n5_kind.cpp:243](../../mods/mods_n5_src/n5_kind.cpp#L243), [mods/mods_n6_src/n6_kind.cpp:338](../../mods/mods_n6_src/n6_kind.cpp#L338), [mods/mods_n7_src/n7_kind.cpp:402](../../mods/mods_n7_src/n7_kind.cpp#L402), [mods/mods_n8_src/n8_kind.cpp:442](../../mods/mods_n8_src/n8_kind.cpp#L442) |
+| `7100cb9de0` |  | [mods/mods_n12_src/n12_kind.cpp:17](../../mods/mods_n12_src/n12_kind.cpp#L17), [mods/mods_n12_src/n12_kind.cpp:194](../../mods/mods_n12_src/n12_kind.cpp#L194), [mods/mods_n4_src/n4_kind.cpp:17](../../mods/mods_n4_src/n4_kind.cpp#L17), [mods/mods_n5_src/n5_kind.cpp:17](../../mods/mods_n5_src/n5_kind.cpp#L17), [mods/mods_n6_src/n6_kind.cpp:17](../../mods/mods_n6_src/n6_kind.cpp#L17), [mods/mods_n7_src/n7_kind.cpp:17](../../mods/mods_n7_src/n7_kind.cpp#L17) and 1 more |
+| `7100cbf1c0` |  | [mods/mods_n12_src/n12_kind.cpp:576](../../mods/mods_n12_src/n12_kind.cpp#L576) |
 | `7101388880` |  | [tests/DEBUG_MODE.md:72](../../tests/DEBUG_MODE.md#L72) |
-| `710147f330` |  | [fighter_sdk/newmodule_host.c:389](../../fighter_sdk/newmodule_host.c#L389) |
+| `710147f330` |  | [fighter_sdk/newmodule_host.c:604](../../fighter_sdk/newmodule_host.c#L604) |
+| `710149ebc0` |  | [fighter_sdk/newmodule_host.c:712](../../fighter_sdk/newmodule_host.c#L712) |
 | `71014f10c0` |  | [tools/lifter/patches/kinds_scan.py:189](../../tools/lifter/patches/kinds_scan.py#L189) |
 | `71014f2510` (in f_71014f10c0) |  | [tools/lifter/patches/kinds_scan.py:204](../../tools/lifter/patches/kinds_scan.py#L204), [tools/lifter/patches/kinds_scan.py:206](../../tools/lifter/patches/kinds_scan.py#L206), [tools/lifter/patches/kinds_scan.py:24](../../tools/lifter/patches/kinds_scan.py#L24) |
 | `7101519430` |  | [fighter_sdk/hook_host.c:538](../../fighter_sdk/hook_host.c#L538) |
 | `710167a270` | `app::metamon::load_metamon_fighter(app::ItemModuleAccessor&)` | [tools/lifter/patches/kinds_scan.py:126](../../tools/lifter/patches/kinds_scan.py#L126) |
 | `71016a60c4` (in f_71016a60a0) |  | [runtime/nnnet_c4a.inc:116](../../runtime/nnnet_c4a.inc#L116) |
-| `71016fa08c` (in f_71016f8d40) |  | [runtime/nnmisc.c:561](../../runtime/nnmisc.c#L561) |
-| `71017634cc` (in f_7101763190) |  | [runtime/nnapplet.c:127](../../runtime/nnapplet.c#L127) |
-| `7101779854` (in f_7101777720) |  | [mods/mods_n4_src/n4_roster.cpp:240](../../mods/mods_n4_src/n4_roster.cpp#L240), [mods/mods_n5_src/n5_roster.cpp:249](../../mods/mods_n5_src/n5_roster.cpp#L249) |
-| `7101788260` |  | [tests/DEBUG_MODE.md:76](../../tests/DEBUG_MODE.md#L76) |
+| `71016fa08c` (in f_71016f8d40) |  | [runtime/nnmisc.c:598](../../runtime/nnmisc.c#L598) |
+| `71017634cc` (in f_7101763190) |  | [runtime/nnapplet.c:124](../../runtime/nnapplet.c#L124) |
+| `7101779854` (in f_7101777720) |  | [mods/mods_n4_src/n4_roster.cpp:240](../../mods/mods_n4_src/n4_roster.cpp#L240), [mods/mods_n5_src/n5_roster.cpp:249](../../mods/mods_n5_src/n5_roster.cpp#L249), [mods/mods_n6_src/n6_roster.cpp:268](../../mods/mods_n6_src/n6_roster.cpp#L268) |
+| `7101788260` |  | [mods/mods_n12_src/n12_kind.cpp:1438](../../mods/mods_n12_src/n12_kind.cpp#L1438), [tests/DEBUG_MODE.md:76](../../tests/DEBUG_MODE.md#L76) |
 | `710178ab60` |  | [tests/DEBUG_MODE.md:83](../../tests/DEBUG_MODE.md#L83) |
 | `710178f498` (in f_710178e2e0) |  | [tests/DEBUG_MODE.md:77](../../tests/DEBUG_MODE.md#L77) |
-| `7101797640` |  | [mods/mods_n3_src/n3_roster.cpp:166](../../mods/mods_n3_src/n3_roster.cpp#L166), [mods/mods_n4_src/n4_roster.cpp:176](../../mods/mods_n4_src/n4_roster.cpp#L176), [mods/mods_n5_src/n5_roster.cpp:185](../../mods/mods_n5_src/n5_roster.cpp#L185) |
-| `71017c15e4` (in f_71017c0f90) |  | [runtime/nnmisc.c:628](../../runtime/nnmisc.c#L628) |
-| `71017df5f0` |  | [fighter_sdk/newmodule_host.c:390](../../fighter_sdk/newmodule_host.c#L390) |
-| `71017dfe50` |  | [fighter_sdk/newmodule_host.c:392](../../fighter_sdk/newmodule_host.c#L392) |
-| `71017e88d0` |  | [fighter_sdk/newmodule_host.c:389](../../fighter_sdk/newmodule_host.c#L389), [mods/mods_n4_src/n4_kind.cpp:303](../../mods/mods_n4_src/n4_kind.cpp#L303), [mods/mods_n5_src/n5_kind.cpp:320](../../mods/mods_n5_src/n5_kind.cpp#L320) |
-| `71017e89c0` (in f_71017e88d0) |  | [fighter_sdk/newmodule_host.c:325](../../fighter_sdk/newmodule_host.c#L325) |
-| `71019eb840` |  | [mods/mods_n2_src/n2_roster_row.cpp:134](../../mods/mods_n2_src/n2_roster_row.cpp#L134), [mods/mods_n3_src/n3_roster.cpp:186](../../mods/mods_n3_src/n3_roster.cpp#L186), [mods/mods_n4_src/n4_roster.cpp:237](../../mods/mods_n4_src/n4_roster.cpp#L237), [mods/mods_n5_src/n5_roster.cpp:246](../../mods/mods_n5_src/n5_roster.cpp#L246) |
+| `7101797640` |  | [mods/mods_n3_src/n3_roster.cpp:166](../../mods/mods_n3_src/n3_roster.cpp#L166), [mods/mods_n4_src/n4_roster.cpp:176](../../mods/mods_n4_src/n4_roster.cpp#L176), [mods/mods_n5_src/n5_roster.cpp:185](../../mods/mods_n5_src/n5_roster.cpp#L185), [mods/mods_n6_src/n6_roster.cpp:204](../../mods/mods_n6_src/n6_roster.cpp#L204) |
+| `71017c15e4` (in f_71017c0f90) |  | [runtime/nnmisc.c:665](../../runtime/nnmisc.c#L665) |
+| `71017df5f0` |  | [fighter_sdk/newmodule_host.c:605](../../fighter_sdk/newmodule_host.c#L605) |
+| `71017dfe50` |  | [fighter_sdk/newmodule_host.c:607](../../fighter_sdk/newmodule_host.c#L607) |
+| `71017e0840` |  | [mods/mods_n12_src/n12_kind.cpp:1132](../../mods/mods_n12_src/n12_kind.cpp#L1132) |
+| `71017e88d0` |  | [fighter_sdk/newmodule_host.c:604](../../fighter_sdk/newmodule_host.c#L604), [mods/mods_n12_src/n12_kind.cpp:1177](../../mods/mods_n12_src/n12_kind.cpp#L1177), [mods/mods_n4_src/n4_kind.cpp:303](../../mods/mods_n4_src/n4_kind.cpp#L303), [mods/mods_n5_src/n5_kind.cpp:408](../../mods/mods_n5_src/n5_kind.cpp#L408), [mods/mods_n6_src/n6_kind.cpp:516](../../mods/mods_n6_src/n6_kind.cpp#L516), [mods/mods_n7_src/n7_kind.cpp:596](../../mods/mods_n7_src/n7_kind.cpp#L596) and 1 more |
+| `71017e89c0` (in f_71017e88d0) |  | [fighter_sdk/newmodule_host.c:540](../../fighter_sdk/newmodule_host.c#L540) |
+| `71017eef20` |  | [mods/mods_n12_src/n12_kind.cpp:1131](../../mods/mods_n12_src/n12_kind.cpp#L1131) |
+| `71017f06e0` |  | [mods/mods_n12_src/n12_kind.cpp:1371](../../mods/mods_n12_src/n12_kind.cpp#L1371), [mods/mods_n5_src/n5_kind.cpp:475](../../mods/mods_n5_src/n5_kind.cpp#L475), [mods/mods_n6_src/n6_kind.cpp:584](../../mods/mods_n6_src/n6_kind.cpp#L584), [mods/mods_n7_src/n7_kind.cpp:664](../../mods/mods_n7_src/n7_kind.cpp#L664), [mods/mods_n8_src/n8_kind.cpp:708](../../mods/mods_n8_src/n8_kind.cpp#L708) |
+| `71017f0bd0` |  | [mods/mods_n12_src/n12_kind.cpp:1369](../../mods/mods_n12_src/n12_kind.cpp#L1369), [mods/mods_n5_src/n5_kind.cpp:473](../../mods/mods_n5_src/n5_kind.cpp#L473), [mods/mods_n6_src/n6_kind.cpp:582](../../mods/mods_n6_src/n6_kind.cpp#L582), [mods/mods_n7_src/n7_kind.cpp:662](../../mods/mods_n7_src/n7_kind.cpp#L662), [mods/mods_n8_src/n8_kind.cpp:706](../../mods/mods_n8_src/n8_kind.cpp#L706) |
+| `71019eb840` |  | [fighter_sdk/newmodule_host.c:678](../../fighter_sdk/newmodule_host.c#L678), [mods/mods_n2_src/n2_roster_row.cpp:134](../../mods/mods_n2_src/n2_roster_row.cpp#L134), [mods/mods_n3_src/n3_roster.cpp:186](../../mods/mods_n3_src/n3_roster.cpp#L186), [mods/mods_n4_src/n4_roster.cpp:237](../../mods/mods_n4_src/n4_roster.cpp#L237), [mods/mods_n5_src/n5_roster.cpp:246](../../mods/mods_n5_src/n5_roster.cpp#L246), [mods/mods_n6_src/n6_roster.cpp:265](../../mods/mods_n6_src/n6_roster.cpp#L265) |
+| `71019ee4d4` (in f_71019eb840) |  | [fighter_sdk/newmodule_host.c:678](../../fighter_sdk/newmodule_host.c#L678) |
+| `71019ee4f4` (in f_71019eb840) |  | [fighter_sdk/newmodule_host.c:678](../../fighter_sdk/newmodule_host.c#L678) |
 | `71022b6620` |  | [fighter_sdk/newmodule_host.c:11](../../fighter_sdk/newmodule_host.c#L11) |
 | `71022b67d0` (in f_71022b6620) |  | [fighter_sdk/newmodule_host.c:12](../../fighter_sdk/newmodule_host.c#L12) |
 | `71022b67d4` (in f_71022b6620) |  | [fighter_sdk/newmodule_host.c:12](../../fighter_sdk/newmodule_host.c#L12) |
-| `71022b68cc` (in f_71022b6620) |  | [fighter_sdk/newmodule_host.c:279](../../fighter_sdk/newmodule_host.c#L279) |
-| `71022b6cd0` (in f_71022b6620) |  | [fighter_sdk/newmodule_host.c:368](../../fighter_sdk/newmodule_host.c#L368) |
+| `71022b68cc` (in f_71022b6620) |  | [fighter_sdk/newmodule_host.c:436](../../fighter_sdk/newmodule_host.c#L436) |
+| `71022b6cd0` (in f_71022b6620) |  | [fighter_sdk/newmodule_host.c:583](../../fighter_sdk/newmodule_host.c#L583) |
 | `71022bca24` (in f_71022b7100) |  | [runtime/nnaudio.c:19](../../runtime/nnaudio.c#L19) |
 | `7102311914` (in f_71023108b0) |  | [tests/DEBUG_MODE.md:77](../../tests/DEBUG_MODE.md#L77) |
-| `7102311a24` (in f_71023108b0) |  | [runtime/debug_mode.c:254](../../runtime/debug_mode.c#L254), [tests/DEBUG_MODE.md:81](../../tests/DEBUG_MODE.md#L81) |
+| `7102311a24` (in f_71023108b0) |  | [runtime/debug_mode.c:268](../../runtime/debug_mode.c#L268), [tests/DEBUG_MODE.md:81](../../tests/DEBUG_MODE.md#L81) |
 | `7102d099c0` | `std::__1::basic_stringbuf<char, std::__1::char_traits<char>, std::__1::allocator<char> >::str() const` | [runtime/cxxrt_selftest.h:418](../../runtime/cxxrt_selftest.h#L418), [runtime/nniostream.c:7](../../runtime/nniostream.c#L7) |
+| `71032384c0` |  | [fighter_sdk/newmodule_host.c:621](../../fighter_sdk/newmodule_host.c#L621) |
+| `7103261d60` |  | [fighter_sdk/newmodule_host.c:675](../../fighter_sdk/newmodule_host.c#L675) |
 | `7103262130` |  | [mods/mods_n2_src/n2_roster_row.cpp:12](../../mods/mods_n2_src/n2_roster_row.cpp#L12) |
 | `7103269e30` |  | [mods/mods_n2_src/n2_roster_row.cpp:12](../../mods/mods_n2_src/n2_roster_row.cpp#L12) |
-| `7103269fd0` |  | [mods/mods_n3_src/n3_roster.cpp:153](../../mods/mods_n3_src/n3_roster.cpp#L153), [mods/mods_n4_src/n4_roster.cpp:163](../../mods/mods_n4_src/n4_roster.cpp#L163), [mods/mods_n5_src/n5_roster.cpp:172](../../mods/mods_n5_src/n5_roster.cpp#L172) |
-| `710326f0f0` |  | [mods/mods_n2_src/n2_roster_row.cpp:127](../../mods/mods_n2_src/n2_roster_row.cpp#L127), [mods/mods_n3_src/n3_roster.cpp:179](../../mods/mods_n3_src/n3_roster.cpp#L179), [mods/mods_n4_src/n4_roster.cpp:211](../../mods/mods_n4_src/n4_roster.cpp#L211), [mods/mods_n5_src/n5_roster.cpp:220](../../mods/mods_n5_src/n5_roster.cpp#L220) |
+| `7103269fd0` |  | [mods/mods_n3_src/n3_roster.cpp:153](../../mods/mods_n3_src/n3_roster.cpp#L153), [mods/mods_n4_src/n4_roster.cpp:163](../../mods/mods_n4_src/n4_roster.cpp#L163), [mods/mods_n5_src/n5_roster.cpp:172](../../mods/mods_n5_src/n5_roster.cpp#L172), [mods/mods_n6_src/n6_roster.cpp:191](../../mods/mods_n6_src/n6_roster.cpp#L191) |
+| `710326f0f0` |  | [mods/mods_n2_src/n2_roster_row.cpp:127](../../mods/mods_n2_src/n2_roster_row.cpp#L127), [mods/mods_n3_src/n3_roster.cpp:179](../../mods/mods_n3_src/n3_roster.cpp#L179), [mods/mods_n4_src/n4_roster.cpp:211](../../mods/mods_n4_src/n4_roster.cpp#L211), [mods/mods_n5_src/n5_roster.cpp:220](../../mods/mods_n5_src/n5_roster.cpp#L220), [mods/mods_n6_src/n6_roster.cpp:239](../../mods/mods_n6_src/n6_roster.cpp#L239) |
 | `71032e88a4` (in f_71032e8880) |  | [runtime/nnmii.c:184](../../runtime/nnmii.c#L184) |
 | `71032e88ac` (in f_71032e8880) |  | [runtime/nnmii.c:23](../../runtime/nnmii.c#L23) |
 | `7103300584` (in f_71033004c0) |  | [runtime/nnapplet.c:40](../../runtime/nnapplet.c#L40) |
-| `7103341bac` (in f_7103341b20) |  | [runtime/nnapplet.c:127](../../runtime/nnapplet.c#L127) |
-| `7103341e50` (in f_7103341b20) |  | [runtime/nnapplet.c:124](../../runtime/nnapplet.c#L124), [runtime/nnapplet.c:27](../../runtime/nnapplet.c#L27) |
-| `71033abee0` |  | [mods/mods_n4_src/n4_kind.cpp:13](../../mods/mods_n4_src/n4_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:13](../../mods/mods_n5_src/n5_kind.cpp#L13) |
-| `71033acde0` |  | [mods/mods_n4_src/n4_kind.cpp:13](../../mods/mods_n4_src/n4_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:13](../../mods/mods_n5_src/n5_kind.cpp#L13) |
-| `71033add40` |  | [mods/mods_n4_src/n4_kind.cpp:13](../../mods/mods_n4_src/n4_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:13](../../mods/mods_n5_src/n5_kind.cpp#L13) |
-| `71033aeca0` |  | [mods/mods_n4_src/n4_kind.cpp:13](../../mods/mods_n4_src/n4_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:13](../../mods/mods_n5_src/n5_kind.cpp#L13) |
-| `71033b5640` |  | [mods/mods_n3_src/n3_kind.cpp:95](../../mods/mods_n3_src/n3_kind.cpp#L95), [mods/mods_n4_src/n4_kind.cpp:11](../../mods/mods_n4_src/n4_kind.cpp#L11), [mods/mods_n5_src/n5_kind.cpp:11](../../mods/mods_n5_src/n5_kind.cpp#L11) |
-| `71033babd0` |  | [mods/mods_n4_src/n4_kind.cpp:292](../../mods/mods_n4_src/n4_kind.cpp#L292), [mods/mods_n5_src/n5_kind.cpp:309](../../mods/mods_n5_src/n5_kind.cpp#L309) |
-| `710353e330` |  | [fighter_sdk/newmodule_host.c:393](../../fighter_sdk/newmodule_host.c#L393) |
-| `710353e4e0` |  | [mods/mods_n4_src/n4_kind.cpp:304](../../mods/mods_n4_src/n4_kind.cpp#L304), [mods/mods_n5_src/n5_kind.cpp:321](../../mods/mods_n5_src/n5_kind.cpp#L321), [runtime/loose_files.c:28](../../runtime/loose_files.c#L28) |
-| `7103540450` |  | [runtime/loose_files.c:28](../../runtime/loose_files.c#L28) |
+| `7103341bac` (in f_7103341b20) |  | [runtime/nnapplet.c:124](../../runtime/nnapplet.c#L124) |
+| `7103341e50` (in f_7103341b20) |  | [runtime/nnapplet.c:121](../../runtime/nnapplet.c#L121), [runtime/nnapplet.c:27](../../runtime/nnapplet.c#L27) |
+| `710339e810` |  | [mods/mods_n12_src/n12_kind.cpp:1014](../../mods/mods_n12_src/n12_kind.cpp#L1014) |
+| `710339fee0` |  | [mods/mods_n12_src/n12_kind.cpp:1139](../../mods/mods_n12_src/n12_kind.cpp#L1139) |
+| `71033a07d0` |  | [mods/mods_n12_src/n12_kind.cpp:1019](../../mods/mods_n12_src/n12_kind.cpp#L1019) |
+| `71033aa1e0` |  | [mods/mods_n12_src/n12_kind.cpp:1016](../../mods/mods_n12_src/n12_kind.cpp#L1016), [mods/mods_n12_src/n12_kind.cpp:1030](../../mods/mods_n12_src/n12_kind.cpp#L1030) |
+| `71033abee0` |  | [mods/mods_n12_src/n12_kind.cpp:135](../../mods/mods_n12_src/n12_kind.cpp#L135), [mods/mods_n12_src/n12_kind.cpp:13](../../mods/mods_n12_src/n12_kind.cpp#L13), [mods/mods_n4_src/n4_kind.cpp:13](../../mods/mods_n4_src/n4_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:13](../../mods/mods_n5_src/n5_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:89](../../mods/mods_n5_src/n5_kind.cpp#L89), [mods/mods_n6_src/n6_kind.cpp:13](../../mods/mods_n6_src/n6_kind.cpp#L13) and 5 more |
+| `71033acde0` |  | [mods/mods_n12_src/n12_kind.cpp:13](../../mods/mods_n12_src/n12_kind.cpp#L13), [mods/mods_n4_src/n4_kind.cpp:13](../../mods/mods_n4_src/n4_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:13](../../mods/mods_n5_src/n5_kind.cpp#L13), [mods/mods_n6_src/n6_kind.cpp:13](../../mods/mods_n6_src/n6_kind.cpp#L13), [mods/mods_n7_src/n7_kind.cpp:13](../../mods/mods_n7_src/n7_kind.cpp#L13), [mods/mods_n8_src/n8_kind.cpp:13](../../mods/mods_n8_src/n8_kind.cpp#L13) |
+| `71033add40` |  | [mods/mods_n12_src/n12_kind.cpp:13](../../mods/mods_n12_src/n12_kind.cpp#L13), [mods/mods_n4_src/n4_kind.cpp:13](../../mods/mods_n4_src/n4_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:13](../../mods/mods_n5_src/n5_kind.cpp#L13), [mods/mods_n6_src/n6_kind.cpp:13](../../mods/mods_n6_src/n6_kind.cpp#L13), [mods/mods_n7_src/n7_kind.cpp:13](../../mods/mods_n7_src/n7_kind.cpp#L13), [mods/mods_n8_src/n8_kind.cpp:13](../../mods/mods_n8_src/n8_kind.cpp#L13) |
+| `71033aeca0` |  | [mods/mods_n12_src/n12_kind.cpp:13](../../mods/mods_n12_src/n12_kind.cpp#L13), [mods/mods_n4_src/n4_kind.cpp:13](../../mods/mods_n4_src/n4_kind.cpp#L13), [mods/mods_n5_src/n5_kind.cpp:13](../../mods/mods_n5_src/n5_kind.cpp#L13), [mods/mods_n6_src/n6_kind.cpp:13](../../mods/mods_n6_src/n6_kind.cpp#L13), [mods/mods_n7_src/n7_kind.cpp:13](../../mods/mods_n7_src/n7_kind.cpp#L13), [mods/mods_n8_src/n8_kind.cpp:13](../../mods/mods_n8_src/n8_kind.cpp#L13) |
+| `71033b5640` |  | [mods/mods_n12_src/n12_kind.cpp:11](../../mods/mods_n12_src/n12_kind.cpp#L11), [mods/mods_n3_src/n3_kind.cpp:95](../../mods/mods_n3_src/n3_kind.cpp#L95), [mods/mods_n4_src/n4_kind.cpp:11](../../mods/mods_n4_src/n4_kind.cpp#L11), [mods/mods_n5_src/n5_kind.cpp:11](../../mods/mods_n5_src/n5_kind.cpp#L11), [mods/mods_n6_src/n6_kind.cpp:11](../../mods/mods_n6_src/n6_kind.cpp#L11), [mods/mods_n7_src/n7_kind.cpp:11](../../mods/mods_n7_src/n7_kind.cpp#L11) and 1 more |
+| `71033babd0` |  | [mods/mods_n12_src/n12_kind.cpp:1002](../../mods/mods_n12_src/n12_kind.cpp#L1002), [mods/mods_n4_src/n4_kind.cpp:292](../../mods/mods_n4_src/n4_kind.cpp#L292), [mods/mods_n5_src/n5_kind.cpp:397](../../mods/mods_n5_src/n5_kind.cpp#L397), [mods/mods_n6_src/n6_kind.cpp:505](../../mods/mods_n6_src/n6_kind.cpp#L505), [mods/mods_n7_src/n7_kind.cpp:585](../../mods/mods_n7_src/n7_kind.cpp#L585), [mods/mods_n8_src/n8_kind.cpp:629](../../mods/mods_n8_src/n8_kind.cpp#L629) |
+| `71033be290` |  | [mods/mods_n12_src/n12_kind.cpp:1018](../../mods/mods_n12_src/n12_kind.cpp#L1018) |
+| `71033be790` |  | [mods/mods_n12_src/n12_kind.cpp:1015](../../mods/mods_n12_src/n12_kind.cpp#L1015), [mods/mods_n12_src/n12_kind.cpp:1030](../../mods/mods_n12_src/n12_kind.cpp#L1030) |
+| `7103440050` |  | [mods/mods_n12_src/n12_kind.cpp:1020](../../mods/mods_n12_src/n12_kind.cpp#L1020), [mods/mods_n12_src/n12_kind.cpp:1037](../../mods/mods_n12_src/n12_kind.cpp#L1037) |
+| `710353e330` |  | [fighter_sdk/newmodule_host.c:608](../../fighter_sdk/newmodule_host.c#L608), [runtime/loose_files.c:46](../../runtime/loose_files.c#L46) |
+| `710353e4e0` |  | [mods/mods_n12_src/n12_kind.cpp:1178](../../mods/mods_n12_src/n12_kind.cpp#L1178), [mods/mods_n4_src/n4_kind.cpp:304](../../mods/mods_n4_src/n4_kind.cpp#L304), [mods/mods_n5_src/n5_kind.cpp:409](../../mods/mods_n5_src/n5_kind.cpp#L409), [mods/mods_n6_src/n6_kind.cpp:517](../../mods/mods_n6_src/n6_kind.cpp#L517), [mods/mods_n7_src/n7_kind.cpp:597](../../mods/mods_n7_src/n7_kind.cpp#L597), [mods/mods_n8_src/n8_kind.cpp:641](../../mods/mods_n8_src/n8_kind.cpp#L641) and 1 more |
+| `710353e5d0` |  | [runtime/loose_files.c:46](../../runtime/loose_files.c#L46) |
+| `710353ff00` |  | [runtime/loose_files.c:886](../../runtime/loose_files.c#L886) |
+| `7103540450` |  | [runtime/loose_files.c:46](../../runtime/loose_files.c#L46) |
+| `7103540860` |  | [runtime/loose_files.c:28](../../runtime/loose_files.c#L28), [runtime/loose_files.c:46](../../runtime/loose_files.c#L46) |
 | `7103541ae0` |  | [runtime/host.c:102](../../runtime/host.c#L102), [runtime/host.c:17](../../runtime/host.c#L17), [runtime/nvn_vk_store.c:13](../../runtime/nvn_vk_store.c#L13) |
-| `71035444c0` |  | [runtime/loose_files.c:15](../../runtime/loose_files.c#L15), [runtime/loose_files.c:28](../../runtime/loose_files.c#L28) |
-| `7103544678` (in f_71035444c0) |  | [runtime/loose_files.c:16](../../runtime/loose_files.c#L16) |
+| `71035444c0` |  | [runtime/loose_files.c:1355](../../runtime/loose_files.c#L1355), [runtime/loose_files.c:14](../../runtime/loose_files.c#L14), [runtime/loose_files.c:29](../../runtime/loose_files.c#L29), [runtime/loose_files.c:46](../../runtime/loose_files.c#L46), [runtime/loose_files.c:529](../../runtime/loose_files.c#L529) |
+| `7103544b2c` (in f_71035444c0) |  | [runtime/loose_files.c:529](../../runtime/loose_files.c#L529) |
+| `7103544b30` (in f_71035444c0) |  | [runtime/loose_files.c:908](../../runtime/loose_files.c#L908) |
+| `7103544d18` (in f_71035444c0) |  | [runtime/loose_files.c:536](../../runtime/loose_files.c#L536) |
+| `7103544d88` (in f_71035444c0) |  | [runtime/loose_files.c:1356](../../runtime/loose_files.c#L1356) |
+| `7103544e18` (in f_71035444c0) |  | [runtime/loose_files.c:1356](../../runtime/loose_files.c#L1356) |
+| `7103545194` (in f_71035444c0) |  | [runtime/loose_files.c:1375](../../runtime/loose_files.c#L1375), [runtime/loose_files.c:536](../../runtime/loose_files.c#L536) |
+| `7103545198` (in f_71035444c0) |  | [runtime/loose_files.c:1374](../../runtime/loose_files.c#L1374) |
+| `7103545438` (in f_71035444c0) |  | [runtime/loose_files.c:1376](../../runtime/loose_files.c#L1376), [runtime/loose_files.c:538](../../runtime/loose_files.c#L538) |
+| `7103545450` (in f_71035444c0) |  | [runtime/loose_files.c:531](../../runtime/loose_files.c#L531) |
+| `7103545468` (in f_71035444c0) |  | [runtime/loose_files.c:530](../../runtime/loose_files.c#L530) |
+| `71035456d0` |  | [runtime/loose_files.c:29](../../runtime/loose_files.c#L29), [runtime/loose_files.c:46](../../runtime/loose_files.c#L46) |
+| `7103549170` |  | [runtime/r1_state.c:1108](../../runtime/r1_state.c#L1108), [runtime/r1_state.c:1401](../../runtime/r1_state.c#L1401) |
+| `710354c720` |  | [runtime/r1_state.c:1364](../../runtime/r1_state.c#L1364) |
+| `710355f8f0` |  | [mods/mods_n12_src/n12_kind.cpp:1437](../../mods/mods_n12_src/n12_kind.cpp#L1437) |
 | `71035b5c50` |  | [runtime/cxxrt_selftest.h:416](../../runtime/cxxrt_selftest.h#L416), [runtime/cxxrt_selftest.h:423](../../runtime/cxxrt_selftest.h#L423) |
-| `710366a4f0` (in f_710366a470) |  | [runtime/nnhid.c:779](../../runtime/nnhid.c#L779) |
+| `71035c2040` |  | [runtime/loose_files.c:600](../../runtime/loose_files.c#L600) |
+| `710366a4f0` (in f_710366a470) |  | [runtime/nnhid.c:803](../../runtime/nnhid.c#L803) |
 | `71036e1df8` (in f_71036e1cd0) |  | [runtime/nnalbum.c:26](../../runtime/nnalbum.c#L26) |
 | `71036e2090` (in f_71036e2080) |  | [runtime/nnalbum.c:26](../../runtime/nnalbum.c#L26) |
-| `71036e3984` (in f_71036e37d0) |  | [runtime/nnmovie_mf.c:1014](../../runtime/nnmovie_mf.c#L1014) |
+| `71036e3984` (in f_71036e37d0) |  | [runtime/nnmovie_mf.c:1013](../../runtime/nnmovie_mf.c#L1013) |
 | `71036e6000` (in f_71036e5f40) |  | [runtime/nnmovie_mf.c:6](../../runtime/nnmovie_mf.c#L6) |
 | `71036e66b4` (in f_71036e6660) |  | [runtime/nnmovie_mf.c:54](../../runtime/nnmovie_mf.c#L54) |
 | `71036e74cc` (in f_71036e7390) |  | [runtime/nnmovie_mf.c:46](../../runtime/nnmovie_mf.c#L46) |
-| `71036e7620` |  | [runtime/nnmovie_mf.c:329](../../runtime/nnmovie_mf.c#L329) |
-| `71036e7690` (in f_71036e7620) |  | [runtime/nnmovie_mf.c:891](../../runtime/nnmovie_mf.c#L891) |
+| `71036e7620` |  | [runtime/nnmovie_mf.c:328](../../runtime/nnmovie_mf.c#L328) |
+| `71036e7690` (in f_71036e7620) |  | [runtime/nnmovie_mf.c:890](../../runtime/nnmovie_mf.c#L890) |
 | `71036eb1e0` (in f_71036eb170) |  | [runtime/nnalbum.c:53](../../runtime/nnalbum.c#L53) |
 | `71036ebaec` (in f_71036eb890) |  | [runtime/nnalbum.c:38](../../runtime/nnalbum.c#L38) |
 | `71036f0230` |  | [runtime/nnmovie_mf.c:26](../../runtime/nnmovie_mf.c#L26) |
@@ -123,31 +168,43 @@ only says where to look. Addresses are of 13.0.4.
 | `71036f0e90` (in f_71036f0970) |  | [runtime/nnmovie_mf.c:41](../../runtime/nnmovie_mf.c#L41) |
 | `71036f0f20` (in f_71036f0970) |  | [runtime/nnmovie_mf.c:46](../../runtime/nnmovie_mf.c#L46) |
 | `71036f19a0` |  | [runtime/nnmovie_mf.c:40](../../runtime/nnmovie_mf.c#L40), [runtime/nnmovie_mf.c:44](../../runtime/nnmovie_mf.c#L44) |
-| `71036f1ccc` (in f_71036f1c50) |  | [runtime/nnmovie_mf.c:573](../../runtime/nnmovie_mf.c#L573), [runtime/nnmovie_mf.c:825](../../runtime/nnmovie_mf.c#L825) |
+| `71036f1ccc` (in f_71036f1c50) |  | [runtime/nnmovie_mf.c:572](../../runtime/nnmovie_mf.c#L572), [runtime/nnmovie_mf.c:824](../../runtime/nnmovie_mf.c#L824) |
 | `71036f1d70` |  | [runtime/nnmovie_mf.c:45](../../runtime/nnmovie_mf.c#L45) |
-| `71036f2580` (in f_71036f2140) |  | [runtime/nnmovie_mf.c:890](../../runtime/nnmovie_mf.c#L890) |
-| `71036f27b4` (in f_71036f2140) |  | [runtime/display.c:246](../../runtime/display.c#L246), [runtime/os_threads.c:347](../../runtime/os_threads.c#L347) |
+| `71036f2580` (in f_71036f2140) |  | [runtime/nnmovie_mf.c:889](../../runtime/nnmovie_mf.c#L889) |
+| `71036f27b4` (in f_71036f2140) |  | [runtime/display.c:402](../../runtime/display.c#L402), [runtime/os_threads.c:340](../../runtime/os_threads.c#L340) |
 | `71036f2f90` (in f_71036f2e80) |  | [runtime/nnmovie_mf.c:46](../../runtime/nnmovie_mf.c#L46) |
-| `71036f3500` |  | [runtime/nnmovie_mf.c:888](../../runtime/nnmovie_mf.c#L888) |
+| `71036f3500` |  | [runtime/nnmovie_mf.c:887](../../runtime/nnmovie_mf.c#L887) |
 | `71036f66bc` (in f_71036f6630) |  | [runtime/nnalbum.c:31](../../runtime/nnalbum.c#L31) |
 | `71036f6ce0` |  | [runtime/nnmovie_mf.c:26](../../runtime/nnmovie_mf.c#L26), [runtime/nnmovie_mf.c:31](../../runtime/nnmovie_mf.c#L31) |
 | `71036f6dd8` (in f_71036f6ce0) |  | [runtime/nnmovie_mf.c:27](../../runtime/nnmovie_mf.c#L27) |
-| `71036f6e2c` (in f_71036f6ce0) |  | [runtime/nnmovie_mf.c:979](../../runtime/nnmovie_mf.c#L979) |
+| `71036f6e2c` (in f_71036f6ce0) |  | [runtime/nnmovie_mf.c:978](../../runtime/nnmovie_mf.c#L978) |
 | `71036f6ff0` |  | [runtime/nnmovie_mf.c:38](../../runtime/nnmovie_mf.c#L38) |
 | `71036f7410` |  | [runtime/nnmovie_mf.c:34](../../runtime/nnmovie_mf.c#L34) |
 | `71036f8780` (in f_71036f86e0) |  | [runtime/nnsdk2.c:399](../../runtime/nnsdk2.c#L399) |
 | `71036f9000` (in f_71036f8e70) |  | [runtime/nnmovie_mf.c:6](../../runtime/nnmovie_mf.c#L6) |
 | `7103703800` (in f_71037037c0) |  | [runtime/nnnet_c4a.inc:115](../../runtime/nnnet_c4a.inc#L115) |
 | `7103704504` (in f_7103704090) |  | [runtime/nnnet_c4a.inc:114](../../runtime/nnnet_c4a.inc#L114) |
+| `7103733f20` | `lib::L2CValue::~L2CValue()` | [fighter_sdk/include/fighter_sdk.h:342](../../fighter_sdk/include/fighter_sdk.h#L342) |
+| `7103733fe0` | `lib::L2CValue::L2CValue(lib::L2CValue const&)` | [fighter_sdk/include/fighter_sdk.h:342](../../fighter_sdk/include/fighter_sdk.h#L342) |
+| `71037341c0` | `lib::L2CValue::L2CValue(char const*)` | [fighter_sdk/include/fighter_sdk.h:341](../../fighter_sdk/include/fighter_sdk.h#L341), [fighter_sdk/tools/status_decomp.py:184](../../fighter_sdk/tools/status_decomp.py#L184) |
+| `7103735ea0` | `lib::L2CValue::length() const` | [fighter_sdk/include/fighter_sdk.h:355](../../fighter_sdk/include/fighter_sdk.h#L355) |
 | `710373ec20` (in f_710373e080) |  | [runtime/nnaudio.c:4](../../runtime/nnaudio.c#L4) |
 | `710373f8b0` (in f_710373e080) |  | [runtime/nnaudio.c:17](../../runtime/nnaudio.c#L17) |
-| `7103741700` |  | [runtime/nnmovie_mf.c:1013](../../runtime/nnmovie_mf.c#L1013) |
-| `71037552fc` (in f_7103755270) |  | [runtime/nnapplet.c:160](../../runtime/nnapplet.c#L160) |
+| `7103741700` |  | [runtime/nnmovie_mf.c:1012](../../runtime/nnmovie_mf.c#L1012) |
+| `7103747270` |  | [runtime/r1_state.c:1104](../../runtime/r1_state.c#L1104) |
+| `7103747b78` (in f_7103747270) |  | [runtime/r1_state.c:4](../../runtime/r1_state.c#L4) |
+| `71037494f8` (in f_7103747270) |  | [runtime/r1_state.c:1216](../../runtime/r1_state.c#L1216), [runtime/r1_state.c:1370](../../runtime/r1_state.c#L1370) |
+| `7103749b20` (in f_7103747270) |  | [runtime/r1_state.c:1106](../../runtime/r1_state.c#L1106), [runtime/r1_state.c:1108](../../runtime/r1_state.c#L1108) |
+| `71037552fc` (in f_7103755270) |  | [runtime/nnapplet.c:157](../../runtime/nnapplet.c#L157) |
 | `710375535c` (in f_7103755270) |  | [runtime/nnapplet.c:26](../../runtime/nnapplet.c#L26) |
 | `71037558a0` |  | [runtime/nnsvc_c5a.inc:26](../../runtime/nnsvc_c5a.inc#L26) |
-| `71037a4100` |  | [tests/DEBUG_MODE.md:150](../../tests/DEBUG_MODE.md#L150) |
+| `71037a3ea0` |  | [fighter_sdk/newmodule_host.c:677](../../fighter_sdk/newmodule_host.c#L677) |
+| `71037a3fc0` |  | [fighter_sdk/newmodule_host.c:677](../../fighter_sdk/newmodule_host.c#L677) |
+| `71037a4100` |  | [tests/DEBUG_MODE.md:153](../../tests/DEBUG_MODE.md#L153) |
 | `71037c4360` (in f_71037c4320) |  | [runtime/nnfsdir.c:10](../../runtime/nnfsdir.c#L10) |
-| `7103810a40` |  | [runtime/display.c:30](../../runtime/display.c#L30) |
+| `71037f0590` |  | [runtime/r1_state.c:1299](../../runtime/r1_state.c#L1299) |
+| `71037f0b40` (in f_71037f0590) |  | [runtime/nvn_gl.c:4675](../../runtime/nvn_gl.c#L4675) |
+| `7103810a40` |  | [runtime/display.c:32](../../runtime/display.c#L32) |
 | `7103828300` |  | [runtime/cxxrt_selftest.h:488](../../runtime/cxxrt_selftest.h#L488), [runtime/nncxxrt.c:17](../../runtime/nncxxrt.c#L17) |
 | `710382d0a0` (in f_7103828300) |  | [runtime/nncxxrt.c:17](../../runtime/nncxxrt.c#L17) |
 | `710382d1cc` (in f_7103828300) |  | [runtime/nncxxrt.c:17](../../runtime/nncxxrt.c#L17) |
@@ -161,47 +218,65 @@ only says where to look. Addresses are of 13.0.4.
 | `7103841d10` |  | [runtime/nncxxrt.c:18](../../runtime/nncxxrt.c#L18) |
 | `7103847670` (in f_7103841d10) |  | [runtime/nncxxrt.c:18](../../runtime/nncxxrt.c#L18) |
 | `710384779c` (in f_7103841d10) |  | [runtime/nncxxrt.c:18](../../runtime/nncxxrt.c#L18) |
-| `71038697e0` |  | [runtime/nnsdk2.c:562](../../runtime/nnsdk2.c#L562), [runtime/nnsdk2.c:571](../../runtime/nnsdk2.c#L571), [runtime/nnsdk2.c:599](../../runtime/nnsdk2.c#L599) |
-| `710386984c` (in f_71038697e0) |  | [runtime/nnsdk2.c:565](../../runtime/nnsdk2.c#L565), [runtime/nnsdk2.c:571](../../runtime/nnsdk2.c#L571) |
-| `7103869874` (in f_71038697e0) |  | [runtime/nnsdk2.c:566](../../runtime/nnsdk2.c#L566) |
-| `710386fc30` |  | [fighter_sdk/fighter_host.c:1241](../../fighter_sdk/fighter_host.c#L1241), [runtime/display.c:267](../../runtime/display.c#L267), [runtime/display.c:30](../../runtime/display.c#L30) |
-| `71038fae10` |  | [runtime/nnmisc.c:789](../../runtime/nnmisc.c#L789) |
+| `71038697e0` |  | [runtime/nnsdk2.c:567](../../runtime/nnsdk2.c#L567), [runtime/nnsdk2.c:576](../../runtime/nnsdk2.c#L576), [runtime/nnsdk2.c:604](../../runtime/nnsdk2.c#L604) |
+| `710386984c` (in f_71038697e0) |  | [runtime/nnsdk2.c:570](../../runtime/nnsdk2.c#L570), [runtime/nnsdk2.c:576](../../runtime/nnsdk2.c#L576) |
+| `7103869874` (in f_71038697e0) |  | [runtime/nnsdk2.c:571](../../runtime/nnsdk2.c#L571) |
+| `710386fc30` |  | [fighter_sdk/fighter_host.c:1249](../../fighter_sdk/fighter_host.c#L1249), [runtime/display.c:32](../../runtime/display.c#L32), [runtime/display.c:424](../../runtime/display.c#L424), [runtime/display.c:815](../../runtime/display.c#L815), [runtime/r1_state.c:3](../../runtime/r1_state.c#L3) |
+| `710386fc84` (in f_710386fc30) |  | [runtime/nvn_gl.c:4676](../../runtime/nvn_gl.c#L4676) |
+| `710386fce0` (in f_710386fc30) |  | [runtime/nvn_gl.c:4673](../../runtime/nvn_gl.c#L4673) |
+| `710386fcf0` (in f_710386fc30) |  | [runtime/nvn_gl.c:4674](../../runtime/nvn_gl.c#L4674) |
+| `71038fae10` |  | [runtime/nnmisc.c:826](../../runtime/nnmisc.c#L826) |
 | `71038fae7c` (in f_71038fae10) |  | [runtime/nnmisc.c:94](../../runtime/nnmisc.c#L94) |
-| `71038faf00` |  | [runtime/nnmisc.c:787](../../runtime/nnmisc.c#L787) |
+| `71038faf00` |  | [runtime/nnmisc.c:824](../../runtime/nnmisc.c#L824) |
 | `71038faf40` (in f_71038faf00) |  | [runtime/nnmisc.c:94](../../runtime/nnmisc.c#L94) |
-| `710392dc40` |  | [runtime/nnsdk.c:133](../../runtime/nnsdk.c#L133) |
-| `710392dce0` |  | [mods/mods_n4_src/n4_kind.cpp:169](../../mods/mods_n4_src/n4_kind.cpp#L169), [mods/mods_n5_src/n5_kind.cpp:186](../../mods/mods_n5_src/n5_kind.cpp#L186), [runtime/libcxx.c:28](../../runtime/libcxx.c#L28), [runtime/nnmovie_mf.c:573](../../runtime/nnmovie_mf.c#L573), [runtime/nnmovie_mf.c:825](../../runtime/nnmovie_mf.c#L825), [runtime/nnmovie_mf.c:8](../../runtime/nnmovie_mf.c#L8) |
-| `710392e590` |  | [runtime/libcxx.c:28](../../runtime/libcxx.c#L28), [runtime/nnsdk.c:134](../../runtime/nnsdk.c#L134) |
+| `710392dc40` |  | [runtime/nnsdk.c:179](../../runtime/nnsdk.c#L179) |
+| `710392dce0` |  | [mods/mods_n12_src/n12_kind.cpp:691](../../mods/mods_n12_src/n12_kind.cpp#L691), [mods/mods_n4_src/n4_kind.cpp:169](../../mods/mods_n4_src/n4_kind.cpp#L169), [mods/mods_n5_src/n5_kind.cpp:273](../../mods/mods_n5_src/n5_kind.cpp#L273), [mods/mods_n6_src/n6_kind.cpp:370](../../mods/mods_n6_src/n6_kind.cpp#L370), [mods/mods_n7_src/n7_kind.cpp:434](../../mods/mods_n7_src/n7_kind.cpp#L434), [mods/mods_n8_src/n8_kind.cpp:474](../../mods/mods_n8_src/n8_kind.cpp#L474) and 4 more |
+| `710392e590` |  | [runtime/libcxx.c:28](../../runtime/libcxx.c#L28), [runtime/nnsdk.c:180](../../runtime/nnsdk.c#L180) |
 | `7103987890` |  | [runtime/nnaudio.c:12](../../runtime/nnaudio.c#L12) |
 | `710398b0fc` (in f_7103987890) |  | [runtime/nnaudio.c:7](../../runtime/nnaudio.c#L7) |
 | `71039937b8` (in f_7103993580) |  | [runtime/nnaudio.c:38](../../runtime/nnaudio.c#L38) |
 | `710399f0b0` |  | [fighter_sdk/tools/luaconst.py:6](../../fighter_sdk/tools/luaconst.py#L6) |
 | `710399f994` (in f_710399f880) |  | [runtime/nnlibc2.c:416](../../runtime/nnlibc2.c#L416) |
 | `71039a3e70` |  | [runtime/host.c:126](../../runtime/host.c#L126), [runtime/host.c:19](../../runtime/host.c#L19), [runtime/nvn_vk_store.c:7](../../runtime/nvn_vk_store.c#L7) |
-| `71039a4040` |  | [runtime/host.c:117](../../runtime/host.c#L117), [runtime/host.c:18](../../runtime/host.c#L18), [runtime/loose_files.c:13](../../runtime/loose_files.c#L13), [runtime/loose_files.c:146](../../runtime/loose_files.c#L146), [runtime/loose_files.c:205](../../runtime/loose_files.c#L205), [runtime/nvn_vk_store.c:6](../../runtime/nvn_vk_store.c#L6) |
+| `71039a4040` |  | [runtime/host.c:117](../../runtime/host.c#L117), [runtime/host.c:18](../../runtime/host.c#L18), [runtime/loose_files.c:1272](../../runtime/loose_files.c#L1272), [runtime/loose_files.c:12](../../runtime/loose_files.c#L12), [runtime/loose_files.c:1429](../../runtime/loose_files.c#L1429), [runtime/nvn_vk_store.c:6](../../runtime/nvn_vk_store.c#L6) |
+| `71039bfb30` |  | [runtime/loose_files.c:1355](../../runtime/loose_files.c#L1355), [runtime/loose_files.c:1438](../../runtime/loose_files.c#L1438) |
 | `71039c20a0` |  | [tools/lifter/patches/kinds_scan.py:40](../../tools/lifter/patches/kinds_scan.py#L40) |
 | `710446f514` (data) |  | [runtime/nnmisc.c:169](../../runtime/nnmisc.c#L169) |
-| `7104470aa8` (data) |  | [runtime/nvn_vk_m4.c:1825](../../runtime/nvn_vk_m4.c#L1825) |
+| `7104470aa8` (data) |  | [runtime/nvn_vk_m4.c:1881](../../runtime/nvn_vk_m4.c#L1881) |
+| `71044bc18c` (data) |  | [fighter_sdk/tools/new_fighter.py:260](../../fighter_sdk/tools/new_fighter.py#L260) |
+| `71044be758` (data) |  | [mods/mods_n12_src/n12_kind.cpp:401](../../mods/mods_n12_src/n12_kind.cpp#L401), [mods/mods_n6_src/n6_kind.cpp:186](../../mods/mods_n6_src/n6_kind.cpp#L186), [mods/mods_n7_src/n7_kind.cpp:250](../../mods/mods_n7_src/n7_kind.cpp#L250), [mods/mods_n8_src/n8_kind.cpp:281](../../mods/mods_n8_src/n8_kind.cpp#L281) |
 | `710453b1c0` (data) |  | [mods/mods_n3_src/n3_kind.cpp:11](../../mods/mods_n3_src/n3_kind.cpp#L11) |
-| `710455d7e4` (data) |  | [mods/mods_n4_src/n4_kind.cpp:12](../../mods/mods_n4_src/n4_kind.cpp#L12), [mods/mods_n5_src/n5_kind.cpp:12](../../mods/mods_n5_src/n5_kind.cpp#L12) |
+| `710453d8c8` (data) |  | [mods/mods_n12_src/n12_kind.cpp:195](../../mods/mods_n12_src/n12_kind.cpp#L195) |
+| `710455cba8` (data) |  | [mods/mods_n12_src/n12_kind.cpp:1016](../../mods/mods_n12_src/n12_kind.cpp#L1016) |
+| `710455d7e4` (data) |  | [mods/mods_n12_src/n12_kind.cpp:12](../../mods/mods_n12_src/n12_kind.cpp#L12), [mods/mods_n4_src/n4_kind.cpp:12](../../mods/mods_n4_src/n4_kind.cpp#L12), [mods/mods_n5_src/n5_kind.cpp:12](../../mods/mods_n5_src/n5_kind.cpp#L12), [mods/mods_n6_src/n6_kind.cpp:12](../../mods/mods_n6_src/n6_kind.cpp#L12), [mods/mods_n7_src/n7_kind.cpp:12](../../mods/mods_n7_src/n7_kind.cpp#L12), [mods/mods_n8_src/n8_kind.cpp:12](../../mods/mods_n8_src/n8_kind.cpp#L12) |
 | `7104f80a70` (data) |  | [mods/mods_n3_src/n3_kind.cpp:10](../../mods/mods_n3_src/n3_kind.cpp#L10) |
-| `7104f80e20` (data) |  | [mods/mods_n3_src/n3_kind.cpp:10](../../mods/mods_n3_src/n3_kind.cpp#L10) |
+| `7104f80e20` (data) |  | [mods/mods_n12_src/n12_kind.cpp:37](../../mods/mods_n12_src/n12_kind.cpp#L37), [mods/mods_n3_src/n3_kind.cpp:10](../../mods/mods_n3_src/n3_kind.cpp#L10), [mods/mods_n6_src/n6_kind.cpp:35](../../mods/mods_n6_src/n6_kind.cpp#L35), [mods/mods_n7_src/n7_kind.cpp:35](../../mods/mods_n7_src/n7_kind.cpp#L35), [mods/mods_n8_src/n8_kind.cpp:35](../../mods/mods_n8_src/n8_kind.cpp#L35) |
 | `7104f811d0` (data) |  | [mods/mods_n3_src/n3_kind.cpp:10](../../mods/mods_n3_src/n3_kind.cpp#L10) |
+| `7104f89490` (data) |  | [mods/mods_n12_src/n12_kind.cpp:1038](../../mods/mods_n12_src/n12_kind.cpp#L1038) |
+| `7104fe35d0` (data) |  | [fighter_sdk/tools/new_fighter.py:264](../../fighter_sdk/tools/new_fighter.py#L264) |
+| `7104fe4f40` (data) |  | [mods/mods_n12_src/n12_kind.cpp:577](../../mods/mods_n12_src/n12_kind.cpp#L577) |
+| `710509ece0` (data) |  | [mods/mods_n12_src/n12_kind.cpp:1370](../../mods/mods_n12_src/n12_kind.cpp#L1370), [mods/mods_n5_src/n5_kind.cpp:474](../../mods/mods_n5_src/n5_kind.cpp#L474), [mods/mods_n6_src/n6_kind.cpp:583](../../mods/mods_n6_src/n6_kind.cpp#L583), [mods/mods_n7_src/n7_kind.cpp:663](../../mods/mods_n7_src/n7_kind.cpp#L663), [mods/mods_n8_src/n8_kind.cpp:707](../../mods/mods_n8_src/n8_kind.cpp#L707) |
+| `7105185bd0` (data) |  | [mods/mods_n12_src/n12_kind.cpp:1133](../../mods/mods_n12_src/n12_kind.cpp#L1133) |
+| `7105188240` (data) |  | [mods/mods_n12_src/n12_kind.cpp:1132](../../mods/mods_n12_src/n12_kind.cpp#L1132) |
+| `71051e2bb8` (data) |  | [mods/mods_n12_src/n12_kind.cpp:1020](../../mods/mods_n12_src/n12_kind.cpp#L1020) |
+| `710529c400` (data) |  | [mods/mods_n12_src/n12_kind.cpp:1015](../../mods/mods_n12_src/n12_kind.cpp#L1015) |
 | `71052a2500` (data) |  | [runtime/nvn_c5.c:13](../../runtime/nvn_c5.c#L13) |
-| `71052a32d8` (data) |  | [runtime/nvn_vk_m4.c:1825](../../runtime/nvn_vk_m4.c#L1825) |
+| `71052a32d8` (data) |  | [runtime/nvn_vk_m4.c:1881](../../runtime/nvn_vk_m4.c#L1881) |
 | `71052bb3a8` (data) |  | [mods/mods_n3_src/n3_kind.cpp:118](../../mods/mods_n3_src/n3_kind.cpp#L118), [tools/lifter/patches/kinds_scan.py:177](../../tools/lifter/patches/kinds_scan.py#L177) |
 | `71052bb3b0` (data) |  | [tools/lifter/patches/kinds_scan.py:2](../../tools/lifter/patches/kinds_scan.py#L2), [tools/lifter/patches/kinds_scan.py:39](../../tools/lifter/patches/kinds_scan.py#L39) |
 | `71052c41b0` (data) |  | [tests/DEBUG_MODE.md:72](../../tests/DEBUG_MODE.md#L72) |
 | `71052c4730` (data) |  | [tests/DEBUG_MODE.md:74](../../tests/DEBUG_MODE.md#L74) |
-| `71053097c0` (data) |  | [runtime/debug_mode.c:255](../../runtime/debug_mode.c#L255), [tests/DEBUG_MODE.md:82](../../tests/DEBUG_MODE.md#L82) |
-| `7105309968` (data) |  | [runtime/debug_mode.c:255](../../runtime/debug_mode.c#L255), [tests/DEBUG_MODE.md:82](../../tests/DEBUG_MODE.md#L82) |
+| `71053097c0` (data) |  | [runtime/debug_mode.c:269](../../runtime/debug_mode.c#L269), [tests/DEBUG_MODE.md:82](../../tests/DEBUG_MODE.md#L82) |
+| `7105309968` (data) |  | [runtime/debug_mode.c:269](../../runtime/debug_mode.c#L269), [tests/DEBUG_MODE.md:82](../../tests/DEBUG_MODE.md#L82) |
 | `7105309985` (data) |  | [tests/DEBUG_MODE.md:101](../../tests/DEBUG_MODE.md#L101) |
-| `710532e730` (data) |  | [mods/mods_n2_src/n2_roster_row.cpp:8](../../mods/mods_n2_src/n2_roster_row.cpp#L8), [mods/mods_n3_src/n3_roster.cpp:10](../../mods/mods_n3_src/n3_roster.cpp#L10), [mods/mods_n4_src/n4_roster.cpp:17](../../mods/mods_n4_src/n4_roster.cpp#L17), [mods/mods_n5_src/n5_roster.cpp:17](../../mods/mods_n5_src/n5_roster.cpp#L17) |
-| `7105331f28` (data) |  | [runtime/loose_files.c:29](../../runtime/loose_files.c#L29) |
-| `710593a440` (data) |  | [runtime/display.c:263](../../runtime/display.c#L263), [runtime/display.c:31](../../runtime/display.c#L31) |
-| `710593c3c0` (data) |  | [runtime/boot.c:341](../../runtime/boot.c#L341) |
+| `710532e730` (data) |  | [mods/mods_n2_src/n2_roster_row.cpp:8](../../mods/mods_n2_src/n2_roster_row.cpp#L8), [mods/mods_n3_src/n3_roster.cpp:10](../../mods/mods_n3_src/n3_roster.cpp#L10), [mods/mods_n4_src/n4_roster.cpp:17](../../mods/mods_n4_src/n4_roster.cpp#L17), [mods/mods_n5_src/n5_roster.cpp:17](../../mods/mods_n5_src/n5_roster.cpp#L17), [mods/mods_n6_src/n6_roster.cpp:17](../../mods/mods_n6_src/n6_roster.cpp#L17) |
+| `710532e9a8` (data) |  | [mods/mods_n12_src/n12_kind.cpp:1015](../../mods/mods_n12_src/n12_kind.cpp#L1015) |
+| `7105331f20` (data) |  | [mods/mods_n12_src/n12_kind.cpp:508](../../mods/mods_n12_src/n12_kind.cpp#L508), [mods/mods_n5_src/n5_kind.cpp:170](../../mods/mods_n5_src/n5_kind.cpp#L170), [mods/mods_n6_src/n6_kind.cpp:264](../../mods/mods_n6_src/n6_kind.cpp#L264), [mods/mods_n7_src/n7_kind.cpp:328](../../mods/mods_n7_src/n7_kind.cpp#L328), [mods/mods_n8_src/n8_kind.cpp:368](../../mods/mods_n8_src/n8_kind.cpp#L368), [runtime/loose_files.c:48](../../runtime/loose_files.c#L48) |
+| `7105331f28` (data) |  | [runtime/loose_files.c:47](../../runtime/loose_files.c#L47) |
+| `710593a440` (data) |  | [runtime/display.c:33](../../runtime/display.c#L33), [runtime/display.c:420](../../runtime/display.c#L420), [runtime/display.c:556](../../runtime/display.c#L556) |
+| `710593c3c0` (data) |  | [runtime/boot.c:343](../../runtime/boot.c#L343) |
 | `710593f938` (data) |  | [runtime/nvn_c5.c:12](../../runtime/nvn_c5.c#L12) |
 | `7106dd4860` (data) |  | [runtime/nnaudio.c:13](../../runtime/nnaudio.c#L13), [runtime/nnaudio.c:5](../../runtime/nnaudio.c#L5) |
 | `7106dd489c` (data) |  | [runtime/nnaudio.c:8](../../runtime/nnaudio.c#L8) |
 | `7106dd48a8` (data) |  | [runtime/nnaudio.c:5](../../runtime/nnaudio.c#L5) |
-| `7107446040` (data) |  | [runtime/nnmovie_mf.c:1013](../../runtime/nnmovie_mf.c#L1013) |
+| `7107446040` (data) |  | [runtime/nnmovie_mf.c:1012](../../runtime/nnmovie_mf.c#L1012) |

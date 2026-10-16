@@ -29,7 +29,7 @@ So cleaning up cannot mean committing cleaned-up C of game functions. It means:
 | 7 | Log and assert strings | the function that references a string with a function or file name in it | proposed: a string → referencing-function index (ADRP+ADD pairs, as `recomp.py` already scans) |
 | 8 | Call-graph propagation | callers and callees of named functions, for example the `sv_animcmd` commands → the module methods they call | proposed |
 | 9 | Community knowledge | names in public, open-source modding projects (`skyline-smash`, `smash-arc`, ARCropolis, `param-labels`), which the runtime already credits | case by case, keeping each project's licence |
-| 10 | Our own runtime work | the 198 addresses in [KNOWN_ADDRESSES.md](KNOWN_ADDRESSES.md), today only as comments | proposed: move them into the names database (#1 below) |
+| 10 | Our own runtime work | the 272 addresses in [KNOWN_ADDRESSES.md](KNOWN_ADDRESSES.md), today only as comments | proposed: move them into the names database (#1 below) |
 
 Sources 3+4 and 5 are the cheapest large gains: 3+4 names the battle-object modules (the heart of gameplay)
 and 5 names whole libraries in one go.
