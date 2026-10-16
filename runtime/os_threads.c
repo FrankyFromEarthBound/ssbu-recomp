@@ -11,7 +11,7 @@
 #include "runtime.h"
 #include "hostrt.h"
 /* L1 round 3, TEST ONLY: guest sync calls during the SSBU_L1_TRACE window (display.c) */
-int display_l1_trace(void); double display_l1_ms(void); const char *guest_thread_name_of(unsigned long tid);
+int display_l1_trace(void); double display_l1_ms(void); const char *guest_thread_name_of(DWORD tid);
 #define L1O(what, key) do { if (display_l1_trace()) { const char *n_ = guest_thread_name_of(GetCurrentThreadId()); printf("l1-trace: %+8.2f %-26s lr %09llx %s %llx%c", display_l1_ms(), n_ ? n_ : "?", (unsigned long long)c->x[30], what, (unsigned long long)(key), 10); } } while (0)
 
 #define A0 (c->x[0])
@@ -222,14 +222,7 @@ void dump_guest_threads(FILE *out) {
 /* Freeze report (nvn_vk_wd.c): every guest thread, the host import it is blocked in, and the state of the nn::os object
  * its first argument names (looked up without creating one). A worker thread listed as "finished" that should run
  * forever, or a wait on an object that is signaled, points at the cause. */
-static Obj *obj_peek(uint64_t key) {
-    unsigned h = (unsigned)((key >> 3) * 2654435761u) & (BUCKETS - 1);
-    AcquireSRWLockShared(&g_table_lock);
-    Obj *o = g_table[h];
-    while (o && o->key != key) o = o->next;
-    ReleaseSRWLockShared(&g_table_lock);
-    return o;
-}
+static Obj *obj_peek(uint64_t key);                   /* below (R1): a look-up without the table lock */
 void os_wait_report(FILE *out) {
     fprintf(out, "  guest threads (blocking import, its first argument, the state of that nn::os object):\n");
     for (int i = 0; i < g_threads_n && i < 256; i++) {

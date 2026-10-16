@@ -281,6 +281,9 @@ static void wd_dump(double stall_s, LONG64 tries_since) {
  * length, where the render thread was in its present, whether a fight was near, the workers' queues, the page faults
  * and the CPU time of the process during the gap. Gaps while the window is minimised are not written. */
 unsigned long nvn_front_present_tid(void);         /* nvn_gl.c */
+#ifndef _WIN32
+static void wd_stall_sample(char *out, size_t cap) { snprintf(out, cap, "    (no call stacks in the Linux build)\n"); }
+#else
 static void wd_stall_sample(char *out, size_t cap) {
     DWORD tids[2] = {(DWORD)nvn_front_present_tid(), g_render_tid};
     size_t at = 0;
@@ -302,6 +305,7 @@ static void wd_stall_sample(char *out, size_t cap) {
         if (at + 2 < cap) { out[at++] = '\n'; out[at] = 0; }
     }
 }
+#endif
 static void wd_stall_write(double ms, LONG64 frame, const char *sample, int where, int fight, DWORD faults, double cpu_ms, LONG64 holds) {
     static int lines;
     char path[MAX_PATH + 16];

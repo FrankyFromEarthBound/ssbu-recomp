@@ -70,8 +70,10 @@ static void vsync_test_key(void);
  *     its present and the next frame's (0 = replaced before it was shown). Histogram in the report and per 600 frames
  *     with SSBU_PACESTAT=1. This is the compositor model "the last picture presented before a vblank is what the next
  *     refresh shows" on MEASURED vblank times; it is not a camera. */
+#ifdef _WIN32
 typedef struct { HDC hDc; UINT hAdapter; LUID AdapterLuid; UINT VidPnSourceId; } KmtOpenAdapterFromHdc;
 typedef struct { UINT hAdapter; UINT hDevice; UINT VidPnSourceId; } KmtWaitVblank;
+#endif
 static SRWLOCK g_vb_lock = SRWLOCK_INIT;
 static CONDITION_VARIABLE g_vb_cv = CONDITION_VARIABLE_INIT;
 static volatile LONG64 g_vb_count, g_vb_qpc;           /* vblanks seen, time of the last one (under g_vb_lock for a consistent pair) */
@@ -105,6 +107,7 @@ static ULONG g_pc_ids[128];
 static int g_pc_n = -1, g_pc_on = 1;
 static uint8_t g_cpu_class[256], g_class_max;
 static volatile LONG64 g_pc_frames, g_pc_frames_slow;
+#ifdef _WIN32
 static void pcore_init(void) {
     ULONG len = 0;
     const char *e = getenv("SSBU_PCORES");
@@ -136,10 +139,16 @@ static void pcore_init(void) {
         SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &st, sizeof st);
     }
 }
+#else
+/* Linux build: CPU sets and ProcessPowerThrottling are Windows calls; the scheduler is left to choose the cores */
+static void pcore_init(void) { g_pc_n = 0; printf("display: CPU: the cores are left to the system (performance-core pinning is a Windows feature of this build)%c", 10); }
+#endif
 /* the calling thread: performance cores only (once per thread is enough; cheap to repeat) */
 void display_perf_thread(void) {
     if (g_pc_n < 0) pcore_init();
+#ifdef _WIN32
     if (g_pc_on && g_pc_n > 0) SetThreadSelectedCpuSets(GetCurrentThread(), g_pc_ids, (ULONG)g_pc_n);
+#endif
 }
 static void precise_wait_until(LONGLONG target, HANDLE timer) {
     LARGE_INTEGER now, due;
@@ -150,6 +159,16 @@ static void precise_wait_until(LONGLONG target, HANDLE timer) {
     if (due.QuadPart < 0) { if (timer && SetWaitableTimer(timer, &due, 0, NULL, NULL, FALSE)) WaitForSingleObject(timer, 100); else Sleep((DWORD)(left * 1000 / g_freq.QuadPart)); }
     for (QueryPerformanceCounter(&now); now.QuadPart < target; QueryPerformanceCounter(&now)) YieldProcessor();
 }
+#ifndef _WIN32
+/* Linux build: no vblank source yet (D3DKMT is Windows); vsync = auto / display then run on our own 60 Hz clock, as on a
+ * Windows PC without one */
+static DWORD WINAPI vblank_thread(LPVOID arg) {
+    (void)arg;
+    printf("display: no vblank source in the Linux build: the refresh clock stays our own 60 Hz clock, on-screen times are not measured%c", 10);
+    InterlockedExchange(&g_vb_state, -1);
+    return 0;
+}
+#else
 static DWORD WINAPI vblank_thread(LPVOID arg) {
     (void)arg;
     HMODULE gdi = LoadLibraryA("gdi32.dll");
@@ -202,6 +221,7 @@ static DWORD WINAPI vblank_thread(LPVOID arg) {
         WakeAllConditionVariable(&g_vb_cv);
     }
 }
+#endif
 static void pace_options(void) {
     if (g_pace_want >= 0) return;
     const char *e = getenv("SSBU_PACE"), *h = getenv("SSBU_PACE_HOLD"), *p = getenv("SSBU_PACE_PHASE");
