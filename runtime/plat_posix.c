@@ -642,10 +642,15 @@ BOOL VirtualFree(LPVOID addr, SIZE_T size, DWORD type) {
 }
 BOOL VirtualProtect(LPVOID addr, SIZE_T size, DWORD prot, DWORD *old) {
     uintptr_t lo = (uintptr_t)addr & ~(uintptr_t)(PAGE - 1), hi = ((uintptr_t)addr + size + PAGE - 1) & ~(uintptr_t)(PAGE - 1);
+    /* a page we did not map (code of the exe or of a .so): its real protection, from the kernel's list. Answering
+     * PAGE_READWRITE here made a caller that restores the old value (the hook table, after patching a function's
+     * entry) take the execute right away from a code page. */
+    MEMORY_BASIC_INFORMATION mi;
+    DWORD untracked_old = VirtualQuery((void *)lo, &mi, sizeof mi) && mi.State == MEM_COMMIT ? mi.Protect : PAGE_READWRITE;
     pthread_mutex_lock(&g_vm_lock);
     int i = seg_find(lo);
     int tracked = i < g_nseg && g_seg[i].lo <= lo;
-    if (old) *old = tracked ? g_seg[i].prot : PAGE_READWRITE;
+    if (old) *old = tracked ? g_seg[i].prot : untracked_old;
     if (mprotect((void *)lo, hi - lo, prot_posix(prot))) { pthread_mutex_unlock(&g_vm_lock); return fail_errno(); }
     if (tracked) {                                   /* per segment: keeps each one's allocation base */
         for (uintptr_t p = lo; p < hi;) {
