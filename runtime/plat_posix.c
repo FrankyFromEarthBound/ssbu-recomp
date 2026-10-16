@@ -1577,3 +1577,43 @@ MMRESULT waveOutSetVolume(HWAVEOUT w, DWORD vol) {
     SDL_SetAudioStreamGain(w->stream, l > r ? l : r);
     return MMSYSERR_NOERROR;
 }
+
+/* boot.c print_build_identity: the Windows build names the link time stamp of the exe and of each DLL beside it; an ELF
+ * file has none, so the Linux build names each of its own files (the exe's folder) with its modification time, size and
+ * GNU build id when the linker wrote one. File names only, as there. */
+typedef struct { const char *dir; size_t dl; } BuildIdArg;
+static int build_identity_one(struct dl_phdr_info *info, size_t size, void *p) {
+    (void)size;
+    const BuildIdArg *a = p;
+    const char *name = info->dlpi_name && info->dlpi_name[0] ? info->dlpi_name : NULL;
+    char self[PATH_MAX];
+    if (!name) { ssize_t k = readlink("/proc/self/exe", self, sizeof self - 1); if (k <= 0) return 0; self[k] = 0; name = self; }
+    if (strncmp(name, a->dir, a->dl)) return 0;          /* ours: the exe's folder */
+    struct stat st;
+    char when[32] = "?", id[48] = "";
+    if (!stat(name, &st)) { struct tm tm; gmtime_r(&st.st_mtime, &tm); strftime(when, sizeof when, "%Y-%m-%d %H:%M:%S UTC", &tm); }
+    for (int i = 0; i < info->dlpi_phnum && !id[0]; i++) {
+        if (info->dlpi_phdr[i].p_type != PT_NOTE) continue;
+        const uint8_t *n = (const uint8_t *)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr), *end = n + info->dlpi_phdr[i].p_memsz;
+        while (n + 12 <= end) {
+            uint32_t nsz = ((const uint32_t *)n)[0], dsz = ((const uint32_t *)n)[1], type = ((const uint32_t *)n)[2];
+            const uint8_t *desc = n + 12 + ((nsz + 3) & ~3u);
+            if (type == 3 && nsz == 4 && !memcmp(n + 12, "GNU", 4)) {
+                for (uint32_t k = 0; k < dsz && k < 20; k++) snprintf(id + 2 * k, sizeof id - 2 * k, "%02x", desc[k]);
+                break;
+            }
+            n = desc + ((dsz + 3) & ~3u);
+        }
+    }
+    printf("build: %-22s modified %s (%lld bytes%s%s)\n", name + a->dl, when, (long long)st.st_size, id[0] ? ", build id " : "", id);
+    return 0;
+}
+void plat_print_build_identity(const char *exe, size_t dir_len) {
+    char dir[PATH_MAX];
+    snprintf(dir, sizeof dir, "%.*s", (int)dir_len, exe);
+    for (char *q = dir; *q; q++) if (*q == '\\') *q = '/';
+    BuildIdArg a = {dir, strlen(dir)};
+    dl_iterate_phdr(build_identity_one, &a);
+}
+/* There are no 8.3 names: callers fall back to the long name. */
+DWORD GetShortPathNameW(LPCWSTR path, LPWSTR out, DWORD n) { (void)path; (void)out; (void)n; SetLastError(1 /* ERROR_INVALID_FUNCTION */); return 0; }

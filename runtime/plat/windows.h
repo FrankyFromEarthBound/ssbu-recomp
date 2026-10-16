@@ -107,6 +107,7 @@ typedef struct { ULONG_PTR Internal, InternalHigh; union { struct { DWORD Offset
 typedef struct { LONG left, top, right, bottom; } RECT;
 typedef struct { LONG x, y; } POINT;
 typedef struct { uint32_t Data1; uint16_t Data2, Data3; uint8_t Data4[8]; } GUID;
+typedef struct EXCEPTION_POINTERS EXCEPTION_POINTERS;        /* opaque: only passed along (hostrt.c diag_minidump, which is Windows-only) */
 typedef GUID IID, CLSID;
 #define IsEqualGUID(a, b) (memcmp((a), (b), sizeof(GUID)) == 0)
 
@@ -438,6 +439,7 @@ BOOL GetDiskFreeSpaceExA(LPCSTR path, ULARGE_INTEGER *avail, ULARGE_INTEGER *tot
 DWORD GetCurrentDirectoryA(DWORD n, LPSTR out);
 BOOL SetCurrentDirectoryA(LPCSTR path);
 DWORD GetFullPathNameA(LPCSTR path, DWORD n, LPSTR out, LPSTR *file);
+DWORD GetShortPathNameW(LPCWSTR path, LPWSTR out, DWORD n);   /* always 0: no 8.3 names */
 typedef struct {
     DWORD dwFileAttributes;
     FILETIME ftCreationTime, ftLastAccessTime, ftLastWriteTime;

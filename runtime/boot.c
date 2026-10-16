@@ -282,6 +282,9 @@ static DWORD WINAPI guest_main(LPVOID arg) {
     return 0;
 }
 
+#ifndef _WIN32
+void plat_print_build_identity(const char *exe, size_t dir_len);     /* plat_posix.c: the same lines from the ELF files */
+#endif
 /* The first lines of every log: which binaries these are (link time stamps of the exe and of the DLLs beside it, the values
  * a minidump also shows) and when the process started, so that a log from another PC names its build. File names only: logs
  * get posted, and the folders name the Windows user. */
@@ -293,6 +296,7 @@ static void print_build_identity(void) {
     size_t dl = slash ? (size_t)(slash - exe + 1) : 0;
     SYSTEMTIME st; GetLocalTime(&st);
     printf("build: %s, started %04d-%02d-%02d %02d:%02d:%02d, process %lu\n", exe + dl, st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, GetCurrentProcessId());
+#ifdef _WIN32
     HMODULE mods[256];
     DWORD need = 0;
     if (!K32EnumProcessModules(GetCurrentProcess(), mods, sizeof mods, &need)) return;
@@ -305,6 +309,10 @@ static void print_build_identity(void) {
         if (!_gmtime64_s(&tm, &t)) strftime(when, sizeof when, "%Y-%m-%d %H:%M:%S UTC", &tm);
         printf("build: %-22s linked %s (stamp %08lx, image %lu bytes)\n", name + dl, when, (unsigned long)nt->FileHeader.TimeDateStamp, (unsigned long)nt->OptionalHeader.SizeOfImage);
     }
+#else
+    (void)name;
+    plat_print_build_identity(exe, dl);
+#endif
 }
 
 /* SSBU_CRASH_TEST=<seconds>: a write to address 0 after that time, on a thread of its own: tries the whole crash path of a

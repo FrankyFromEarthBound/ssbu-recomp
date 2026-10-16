@@ -737,7 +737,9 @@ static void diag_modules(FILE *f) {
     }
     fclose(m);
 }
-/* The crash report also goes to <exe name>_crash.txt next to the exe (appended; SSBU_REPORT_DIR: there), as on Windows. */
+/* The crash report also goes to <exe name>_crash.txt next to the exe (appended; SSBU_REPORT_DIR: there), as on Windows.
+ * Register numbers of mcontext_t.gregs on x86-64 (sys/ucontext.h names them only with _GNU_SOURCE). */
+enum { G_R8, G_R9, G_R10, G_R11, G_R12, G_R13, G_R14, G_R15, G_RDI, G_RSI, G_RBP, G_RBX, G_RDX, G_RAX, G_RCX, G_RSP, G_RIP, G_EFL, G_CSGSFS, G_ERR };
 static void crash_file_report(int sig, siginfo_t *si, ucontext_t *u) {
     char path[2 * MAX_PATH];
     if (!diag_report_path(path, sizeof path, "_crash.txt")) return;
@@ -748,17 +750,17 @@ static void crash_file_report(int sig, siginfo_t *si, ucontext_t *u) {
     DWORD tid = GetCurrentThreadId();
     const char *tn = guest_thread_name_of(tid);
     char sym[400];
-    plat_symbolize((uintptr_t)g[REG_RIP], sym, sizeof sym);
+    plat_symbolize((uintptr_t)g[G_RIP], sym, sizeof sym);
     fprintf(f, "=== %04d-%02d-%02d %02d:%02d:%02d  HOST SIGNAL %d (%s) at %p (%s)\n", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
-            sig, strsignal(sig), (void *)g[REG_RIP], sym);
-    if (sig == SIGSEGV || sig == SIGBUS) fprintf(f, "  %s address %p\n", (g[REG_ERR] & 2) ? "writing" : "reading", si->si_addr);
+            sig, strsignal(sig), (void *)g[G_RIP], sym);
+    if (sig == SIGSEGV || sig == SIGBUS) fprintf(f, "  %s address %p\n", (g[G_ERR] & 2) ? "writing" : "reading", si->si_addr);
     fprintf(f, "thread %lu (%s), on logical processor %lu\n", (unsigned long)tid, tn ? tn : "not a guest thread, or the main thread", (unsigned long)GetCurrentProcessorNumber());
     fprintf(f, "host registers: rax %016llx rbx %016llx rcx %016llx rdx %016llx\n                rsi %016llx rdi %016llx rbp %016llx rsp %016llx\n"
                "                r8  %016llx r9  %016llx r10 %016llx r11 %016llx\n                r12 %016llx r13 %016llx r14 %016llx r15 %016llx\n",
-            g[REG_RAX], g[REG_RBX], g[REG_RCX], g[REG_RDX], g[REG_RSI], g[REG_RDI], g[REG_RBP], g[REG_RSP],
-            g[REG_R8], g[REG_R9], g[REG_R10], g[REG_R11], g[REG_R12], g[REG_R13], g[REG_R14], g[REG_R15]);
+            g[G_RAX], g[G_RBX], g[G_RCX], g[G_RDX], g[G_RSI], g[G_RDI], g[G_RBP], g[G_RSP],
+            g[G_R8], g[G_R9], g[G_R10], g[G_R11], g[G_R12], g[G_R13], g[G_R14], g[G_R15]);
     MEMORY_BASIC_INFORMATION mbi;       /* a stack overflow leaves rsp on a guard page: reading it would fault again */
-    uintptr_t rsp = (uintptr_t)g[REG_RSP];
+    uintptr_t rsp = (uintptr_t)g[G_RSP];
     if (VirtualQuery((void *)(rsp - 0x40), &mbi, sizeof mbi) && mbi.State == MEM_COMMIT && !(mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS))) {
         fprintf(f, "host stack from rsp-0x40:\n");
         const uint64_t *s = (const uint64_t *)(rsp - 0x40);

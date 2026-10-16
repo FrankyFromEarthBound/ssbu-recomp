@@ -6,7 +6,8 @@
  *     samples of the other selected streams met on the way are kept for their own calls, unselected ones dropped;
  *   - video comes out as tightly packed NV12 (Y rows of w bytes, then (h+1)/2 rows of interleaved UV), audio as
  *     16-bit PCM at the stream's own rate and channel count unless the caller asked for others;
- *   - SetCurrentPosition seeks to the key frame at or before the time and forgets what was buffered. */
+ *   - SetCurrentPosition seeks to the key frame at or before the time and forgets what was buffered.
+ * And, at the end, the H.264 decoder transform (MFT) the final smash movies feed with NAL units (see there). */
 #define _GNU_SOURCE
 #include "plat/mfapi.h"
 #include <libavformat/avformat.h>
@@ -15,6 +16,7 @@
 #include <libswresample/swresample.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/opt.h>
+#include <wchar.h>
 
 #undef fopen
 
@@ -37,6 +39,15 @@ const GUID MFMediaType_Video = FCC_GUID('v', 'i', 'd', 's');
 const GUID MFMediaType_Audio = FCC_GUID('a', 'u', 'd', 's');
 const GUID MFVideoFormat_NV12 = FCC_GUID('N', 'V', '1', '2');
 const GUID MFAudioFormat_PCM = NUM_GUID(1);
+const GUID MFAudioFormat_Float = NUM_GUID(3);
+const GUID MFVideoFormat_H264 = FCC_GUID('H', '2', '6', '4');
+const GUID MF_MT_INTERLACE_MODE = {0xe2724bb8, 0xe676, 0x4806, {0xb4, 0xb2, 0xa8, 0xd6, 0xef, 0xb4, 0x4c, 0xcd}};
+const GUID MFT_FRIENDLY_NAME_Attribute = {0x314ffbae, 0x5b41, 0x4c95, {0x9c, 0x19, 0x4e, 0x7d, 0x58, 0x6f, 0xac, 0xe3}};
+const GUID IID_IMFTransform = {0xbf94c121, 0x5b05, 0x4e6f, {0x80, 0x00, 0xba, 0x59, 0x89, 0x61, 0x41, 0x4d}};
+const GUID MFT_CATEGORY_VIDEO_DECODER = {0xd6c02d4b, 0x6833, 0x45b4, {0x97, 0x1a, 0x05, 0xa4, 0xb0, 0x4b, 0xab, 0x91}};
+const GUID MFT_CATEGORY_AUDIO_DECODER = {0x9ea73fb4, 0xef7a, 0x4559, {0x8d, 0x5d, 0x71, 0x9d, 0x8f, 0x04, 0x26, 0xc7}};
+const GUID IID_IUnknown = {0x00000000, 0x0000, 0x0000, {0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}};
+const GUID IID_IClassFactory = {0x00000001, 0x0000, 0x0000, {0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}};
 static const GUID k_vorbis = {0x8D2FD10B, 0x5841, 0x4a6b, {0x89, 0x05, 0x58, 0x8F, 0xEC, 0x1A, 0xDE, 0xD9}};
 #define MF_E_NO_MORE_TYPES ((HRESULT)0xC00D36B9)
 #define MF_E_INVALIDREQUEST ((HRESULT)0xC00D36B2)
@@ -89,24 +100,42 @@ HRESULT IMFMediaType_GetUINT32(IMFMediaType *t, const GUID *k, UINT32 *v) { MTAt
 HRESULT IMFMediaType_SetUINT64(IMFMediaType *t, const GUID *k, UINT64 v) { MTAttr *a = mt_find(t, k, 1); if (!a) return E_OUTOFMEMORY; a->kind = 2; a->u = v; return S_OK; }
 HRESULT IMFMediaType_GetUINT64(IMFMediaType *t, const GUID *k, UINT64 *v) { MTAttr *a = mt_find(t, k, 0); if (!a || a->kind != 2) return MF_E_ATTRIBUTENOTFOUND; *v = a->u; return S_OK; }
 
-/* ---- samples and buffers: one contiguous block each */
-struct IMFSample { volatile LONG refs; uint8_t *data; DWORD len; };
-struct IMFMediaBuffer { volatile LONG refs; IMFSample *s; };
-static IMFSample *sample_new(size_t len) {
-    IMFSample *s = calloc(1, sizeof *s);
-    s->refs = 1; s->len = (DWORD)len; s->data = malloc(len ? len : 1);
-    return s;
-}
-ULONG IMFSample_Release(IMFSample *s) { LONG n = InterlockedDecrement(&s->refs); if (!n) { free(s->data); free(s); } return (ULONG)n; }
-HRESULT IMFSample_ConvertToContiguousBuffer(IMFSample *s, IMFMediaBuffer **out) {
+/* ---- samples and buffers: a sample holds at most one buffer, a buffer one contiguous block */
+struct IMFMediaBuffer { volatile LONG refs; uint8_t *data; DWORD max, len; };
+struct IMFSample { volatile LONG refs; IMFMediaBuffer *b; LONGLONG time; };
+HRESULT MFCreateMemoryBuffer(DWORD max, IMFMediaBuffer **out) {
     IMFMediaBuffer *b = calloc(1, sizeof *b);
-    b->refs = 1; b->s = s; InterlockedIncrement(&s->refs);
+    if (!b || !(b->data = malloc(max ? max : 1))) { free(b); *out = NULL; return E_OUTOFMEMORY; }
+    b->refs = 1; b->max = max;
     *out = b;
     return S_OK;
 }
-HRESULT IMFMediaBuffer_Lock(IMFMediaBuffer *b, BYTE **data, DWORD *max, DWORD *len) { *data = b->s->data; if (max) *max = b->s->len; if (len) *len = b->s->len; return S_OK; }
+ULONG IMFMediaBuffer_Release(IMFMediaBuffer *b) { LONG n = InterlockedDecrement(&b->refs); if (!n) { free(b->data); free(b); } return (ULONG)n; }
+HRESULT MFCreateSample(IMFSample **out) { IMFSample *s = calloc(1, sizeof *s); if (!s) return E_OUTOFMEMORY; s->refs = 1; *out = s; return S_OK; }
+static IMFSample *sample_new(size_t len) {          /* a sample with one buffer of len bytes, all of them in use */
+    IMFSample *s = NULL;
+    MFCreateSample(&s);
+    if (s && MFCreateMemoryBuffer((DWORD)len, &s->b) == S_OK) { s->b->len = (DWORD)len; return s; }
+    free(s);
+    return NULL;
+}
+ULONG IMFSample_Release(IMFSample *s) { LONG n = InterlockedDecrement(&s->refs); if (!n) { if (s->b) IMFMediaBuffer_Release(s->b); free(s); } return (ULONG)n; }
+HRESULT IMFSample_AddBuffer(IMFSample *s, IMFMediaBuffer *b) {
+    if (s->b) return E_FAIL;                            /* not needed by nnmovie_mf.c: one buffer per sample */
+    InterlockedIncrement(&b->refs); s->b = b;
+    return S_OK;
+}
+HRESULT IMFSample_SetSampleTime(IMFSample *s, LONGLONG t) { s->time = t; return S_OK; }
+HRESULT IMFSample_GetSampleTime(IMFSample *s, LONGLONG *t) { *t = s->time; return S_OK; }
+HRESULT IMFSample_ConvertToContiguousBuffer(IMFSample *s, IMFMediaBuffer **out) {
+    if (!s->b) { *out = NULL; return E_FAIL; }
+    InterlockedIncrement(&s->b->refs);
+    *out = s->b;
+    return S_OK;
+}
+HRESULT IMFMediaBuffer_Lock(IMFMediaBuffer *b, BYTE **data, DWORD *max, DWORD *len) { *data = b->data; if (max) *max = b->max; if (len) *len = b->len; return S_OK; }
 HRESULT IMFMediaBuffer_Unlock(IMFMediaBuffer *b) { (void)b; return S_OK; }
-ULONG IMFMediaBuffer_Release(IMFMediaBuffer *b) { LONG n = InterlockedDecrement(&b->refs); if (!n) { IMFSample_Release(b->s); free(b); } return (ULONG)n; }
+HRESULT IMFMediaBuffer_SetCurrentLength(IMFMediaBuffer *b, DWORD len) { if (len > b->max) return E_INVALIDARG; b->len = len; return S_OK; }
 HRESULT IMFMediaBuffer_QueryInterface(IMFMediaBuffer *b, const GUID *iid, void **out) { (void)b; (void)iid; *out = NULL; return E_NOINTERFACE; }
 HRESULT IMF2DBuffer_Lock2D(IMF2DBuffer *b, BYTE **scan0, LONG *pitch) { (void)b; (void)scan0; (void)pitch; return E_NOINTERFACE; }
 HRESULT IMF2DBuffer_Unlock2D(IMF2DBuffer *b) { (void)b; return S_OK; }
@@ -345,9 +374,10 @@ static void demux_one(IMFSourceReader *r) {
 static IMFSample *convert_video(RStream *s, const AVFrame *f) {
     int w = f->width, h = f->height, uvrows = (h + 1) / 2;
     IMFSample *out = sample_new((size_t)w * h + (size_t)w * uvrows);
+    if (!out) return NULL;
     s->sws = sws_getCachedContext(s->sws, w, h, (enum AVPixelFormat)f->format, w, h, AV_PIX_FMT_NV12, SWS_POINT, NULL, NULL, NULL);
     if (!s->sws) { IMFSample_Release(out); return NULL; }
-    uint8_t *dst[4] = {out->data, out->data + (size_t)w * h, NULL, NULL};
+    uint8_t *dst[4] = {out->b->data, out->b->data + (size_t)w * h, NULL, NULL};
     int pitch[4] = {w, w, 0, 0};
     sws_scale(s->sws, (const uint8_t *const *)f->data, f->linesize, 0, h, dst, pitch);
     return out;
@@ -366,10 +396,11 @@ static IMFSample *convert_audio(RStream *s, const AVFrame *f) {
     }
     int cap = (int)av_rescale_rnd(swr_get_delay(s->swr, f->sample_rate) + f->nb_samples, rate, f->sample_rate, AV_ROUND_UP) + 16;
     IMFSample *out = sample_new((size_t)cap * ch * 2);
-    uint8_t *dst = out->data;
+    if (!out) return NULL;
+    uint8_t *dst = out->b->data;
     int got = swr_convert(s->swr, &dst, cap, (const uint8_t **)f->extended_data, f->nb_samples);
     if (got < 0) { IMFSample_Release(out); return NULL; }
-    out->len = (DWORD)(got * ch * 2);
+    out->b->len = (DWORD)(got * ch * 2);
     return out;
 }
 HRESULT IMFSourceReader_ReadSample(IMFSourceReader *r, DWORD stream, DWORD control, DWORD *actual, DWORD *flags, LONGLONG *time, IMFSample **out) {
@@ -390,6 +421,7 @@ HRESULT IMFSourceReader_ReadSample(IMFSourceReader *r, DWORD stream, DWORD contr
             if (time) *time = ts == AV_NOPTS_VALUE ? 0 : av_rescale_q(ts, s->st->time_base, (AVRational){1, 10000000});
             av_frame_unref(r->frame);
             if (!smp) { *flags = MF_SOURCE_READERF_ERROR; return E_FAIL; }
+            if (time) smp->time = *time;
             *out = smp;
             return S_OK;
         }
@@ -414,4 +446,220 @@ HRESULT IMFSourceReader_ReadSample(IMFSourceReader *r, DWORD stream, DWORD contr
         av_packet_free(&p);
         if (e < 0 && e != AVERROR_INVALIDDATA) { *flags = MF_SOURCE_READERF_ERROR; return E_FAIL; }
     }
+}
+
+/* ---- the H.264 decoder transform (final smash movies, nnmovie_mf.c h264_*)
+ * What nnmovie_mf.c relies on, as Microsoft's H.264 decoder MFT does it:
+ *   - input: samples of Annex B data (start codes) with a time in 100 ns; the game cuts the stream into NAL units, so
+ *     libavcodec's H.264 parser joins them into whole pictures before they reach the decoder;
+ *   - output: NV12 pictures with the input time of the picture, in display order; the size the stream's own SPS gives
+ *     (cropped: 1080 rows, where Microsoft's decoder hands out 1088 and says so in MF_MT_FRAME_SIZE); a change of size
+ *     answers MF_E_TRANSFORM_STREAM_CHANGE once, the caller then takes the new output type;
+ *   - this transform provides its output samples (MFT_OUTPUT_STREAM_PROVIDES_SAMPLES): ProcessOutput gets no buffer;
+ *   - DRAIN: the pictures still inside come out, then NEED_MORE_INPUT; FLUSH: everything inside is dropped.
+ * Synchronous, one thread per call; nnmovie_mf.c calls a decoder's transform under that decoder's lock. */
+struct IMFActivate { volatile LONG refs; int kind; };       /* 1 = H.264 video decoder, 2 = Vorbis (listed, not activated) */
+struct IMFTransform {
+    volatile LONG refs;
+    AVCodecContext *cc;
+    AVCodecParserContext *parser;
+    AVPacket *pkt;
+    AVFrame **q;                                       /* pictures received from libavcodec, not handed out yet */
+    int qn, qcap;
+    int in_w, in_h, out_w, out_h, out_set, drained;
+    struct SwsContext *sws;
+};
+static int h264_decoder_present(void) { return avcodec_find_decoder(AV_CODEC_ID_H264) != NULL; }
+static int vorbis_decoder_present(void) { return avcodec_find_decoder(AV_CODEC_ID_VORBIS) != NULL; }
+HRESULT MFTEnumEx(GUID category, UINT32 flags, const MFT_REGISTER_TYPE_INFO *in, const MFT_REGISTER_TYPE_INFO *out, IMFActivate ***acts, UINT32 *n) {
+    (void)out;
+    *acts = NULL; *n = 0;
+    int kind = 0;
+    if (!(flags & MFT_ENUM_FLAG_SYNCMFT)) return S_OK;                 /* both are synchronous transforms */
+    if (IsEqualGUID(&category, &MFT_CATEGORY_VIDEO_DECODER) && in && IsEqualGUID(&in->guidSubtype, &MFVideoFormat_H264) && h264_decoder_present()) kind = 1;
+    if (IsEqualGUID(&category, &MFT_CATEGORY_AUDIO_DECODER) && in && IsEqualGUID(&in->guidSubtype, &k_vorbis) && vorbis_decoder_present()) kind = 2;
+    if (!kind) return S_OK;
+    IMFActivate **a = CoTaskMemAlloc(sizeof *a);
+    if (!a || !(a[0] = calloc(1, sizeof **a))) { CoTaskMemFree(a); return E_OUTOFMEMORY; }
+    a[0]->refs = 1; a[0]->kind = kind;
+    *acts = a; *n = 1;
+    return S_OK;
+}
+HRESULT MFTRegisterLocal(IClassFactory *f, const GUID *category, LPCWSTR name, UINT32 flags, UINT32 nin, const MFT_REGISTER_TYPE_INFO *in,
+                         UINT32 nout, const MFT_REGISTER_TYPE_INFO *out) {
+    (void)f; (void)category; (void)name; (void)flags; (void)nin; (void)in; (void)nout; (void)out;
+    return E_NOTIMPL;                                  /* never needed: the Vorbis decoder above is always listed */
+}
+ULONG IMFActivate_Release(IMFActivate *a) { LONG n = InterlockedDecrement(&a->refs); if (!n) free(a); return (ULONG)n; }
+HRESULT IMFActivate_GetString(IMFActivate *a, const GUID *key, LPWSTR out, UINT32 cch, UINT32 *len) {
+    if (!IsEqualGUID(key, &MFT_FRIENDLY_NAME_Attribute) || !cch) return MF_E_ATTRIBUTENOTFOUND;
+    int k = swprintf(out, cch, L"%s (FFmpeg libavcodec %s)", a->kind == 1 ? "H.264 decoder" : "Vorbis decoder", av_version_info());
+    if (k < 0) { out[0] = 0; k = 0; }
+    if (len) *len = (UINT32)k;
+    return S_OK;
+}
+static void mft_reset_parser(IMFTransform *t) {
+    if (t->parser) av_parser_close(t->parser);
+    t->parser = av_parser_init(AV_CODEC_ID_H264);
+}
+static void mft_drop_queue(IMFTransform *t) { for (int i = 0; i < t->qn; i++) av_frame_free(&t->q[i]); t->qn = 0; }
+HRESULT IMFActivate_ActivateObject(IMFActivate *a, const GUID *iid, void **out) {
+    *out = NULL;
+    if (a->kind != 1 || !IsEqualGUID(iid, &IID_IMFTransform)) return E_NOINTERFACE;
+    const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+    IMFTransform *t = calloc(1, sizeof *t);
+    if (!codec || !t) { free(t); return MF_E_TOPO_CODEC_NOT_FOUND; }
+    t->refs = 1;
+    t->cc = avcodec_alloc_context3(codec);
+    t->pkt = av_packet_alloc();
+    mft_reset_parser(t);
+    if (!t->cc || !t->pkt || !t->parser) { IMFTransform_Release(t); return E_OUTOFMEMORY; }
+    t->cc->pkt_timebase = (AVRational){1, 10000000};  /* sample times stay in 100 ns */
+    t->cc->thread_count = 0;
+    if (avcodec_open2(t->cc, codec, NULL) < 0) { IMFTransform_Release(t); return MF_E_TOPO_CODEC_NOT_FOUND; }
+    *out = t;
+    return S_OK;
+}
+ULONG IMFTransform_Release(IMFTransform *t) {
+    LONG n = InterlockedDecrement(&t->refs);
+    if (n) return (ULONG)n;
+    mft_drop_queue(t); free(t->q);
+    if (t->parser) av_parser_close(t->parser);
+    if (t->cc) avcodec_free_context(&t->cc);
+    av_packet_free(&t->pkt);
+    if (t->sws) sws_freeContext(t->sws);
+    free(t);
+    return 0;
+}
+ULONG IMFCollection_Release(IMFCollection *c) { (void)c; return 0; }      /* ProcessOutput never hands out events */
+static void mft_size_of(IMFMediaType *type, int *w, int *h) {
+    UINT64 fs = 0;
+    if (IMFMediaType_GetUINT64(type, &MF_MT_FRAME_SIZE, &fs) == S_OK) { *w = (int)(fs >> 32); *h = (int)(fs & 0xffffffff); }
+}
+HRESULT IMFTransform_SetInputType(IMFTransform *t, DWORD stream, IMFMediaType *type, DWORD flags) {
+    (void)flags;
+    GUID sub = GUID_NULL;
+    if (stream) return MF_E_INVALIDSTREAMNUMBER;
+    if (!type) return S_OK;
+    if (IMFMediaType_GetGUID(type, &MF_MT_SUBTYPE, &sub) != S_OK || !IsEqualGUID(&sub, &MFVideoFormat_H264)) return MF_E_INVALIDMEDIATYPE;
+    mft_size_of(type, &t->in_w, &t->in_h);
+    return S_OK;
+}
+HRESULT IMFTransform_GetOutputAvailableType(IMFTransform *t, DWORD stream, DWORD index, IMFMediaType **out) {
+    *out = NULL;
+    if (stream) return MF_E_INVALIDSTREAMNUMBER;
+    if (index) return MF_E_NO_MORE_TYPES;              /* NV12 only */
+    int w = t->out_w ? t->out_w : t->in_w, h = t->out_w ? t->out_h : t->in_h;
+    IMFMediaType *m;
+    MFCreateMediaType(&m);
+    IMFMediaType_SetGUID(m, &MF_MT_MAJOR_TYPE, &MFMediaType_Video);
+    IMFMediaType_SetGUID(m, &MF_MT_SUBTYPE, &MFVideoFormat_NV12);
+    IMFMediaType_SetUINT64(m, &MF_MT_FRAME_SIZE, ((UINT64)(UINT32)w << 32) | (UINT32)h);
+    IMFMediaType_SetUINT32(m, &MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+    *out = m;
+    return S_OK;
+}
+HRESULT IMFTransform_SetOutputType(IMFTransform *t, DWORD stream, IMFMediaType *type, DWORD flags) {
+    (void)flags;
+    GUID sub = GUID_NULL;
+    if (stream) return MF_E_INVALIDSTREAMNUMBER;
+    if (!type) { t->out_set = 0; return S_OK; }
+    if (IMFMediaType_GetGUID(type, &MF_MT_SUBTYPE, &sub) != S_OK || !IsEqualGUID(&sub, &MFVideoFormat_NV12)) return MF_E_INVALIDMEDIATYPE;
+    mft_size_of(type, &t->out_w, &t->out_h);
+    t->out_set = 1;
+    return S_OK;
+}
+HRESULT IMFTransform_GetOutputStreamInfo(IMFTransform *t, DWORD stream, MFT_OUTPUT_STREAM_INFO *info) {
+    if (stream) return MF_E_INVALIDSTREAMNUMBER;
+    info->dwFlags = MFT_OUTPUT_STREAM_PROVIDES_SAMPLES;
+    info->cbSize = (DWORD)(t->out_w * t->out_h + t->out_w * ((t->out_h + 1) / 2));
+    info->cbAlignment = 0;
+    return S_OK;
+}
+/* Every picture libavcodec has ready, into the queue. */
+static void mft_receive(IMFTransform *t) {
+    for (;;) {
+        AVFrame *f = av_frame_alloc();
+        if (!f || avcodec_receive_frame(t->cc, f) < 0) { av_frame_free(&f); return; }
+        if (t->qn == t->qcap) { t->qcap = t->qcap ? t->qcap * 2 : 8; t->q = realloc(t->q, (size_t)t->qcap * sizeof *t->q); }
+        t->q[t->qn++] = f;
+    }
+}
+static void mft_send(IMFTransform *t, AVPacket *p) {   /* p = NULL: drain */
+    for (int tries = 0; tries < 2; tries++) {
+        if (avcodec_send_packet(t->cc, p) != AVERROR(EAGAIN)) break;
+        mft_receive(t);                                /* output first, then the same packet again */
+    }
+    mft_receive(t);
+}
+HRESULT IMFTransform_ProcessMessage(IMFTransform *t, MFT_MESSAGE_TYPE msg, ULONG_PTR param) {
+    (void)param;
+    if (msg == MFT_MESSAGE_COMMAND_FLUSH) {
+        avcodec_flush_buffers(t->cc);
+        mft_reset_parser(t);
+        mft_drop_queue(t);
+        t->drained = 0;
+    } else if (msg == MFT_MESSAGE_COMMAND_DRAIN && !t->drained) {
+        uint8_t *au = NULL; int au_len = 0;            /* the picture the parser still holds, then the decoder's own */
+        av_parser_parse2(t->parser, t->cc, &au, &au_len, NULL, 0, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
+        if (au_len > 0) {
+            t->pkt->data = au; t->pkt->size = au_len; t->pkt->pts = t->parser->pts; t->pkt->dts = AV_NOPTS_VALUE;
+            mft_send(t, t->pkt);
+            av_packet_unref(t->pkt);
+        }
+        mft_send(t, NULL);
+        t->drained = 1;
+    }
+    return S_OK;                                       /* streaming notifications: nothing to do */
+}
+HRESULT IMFTransform_ProcessInput(IMFTransform *t, DWORD stream, IMFSample *s, DWORD flags) {
+    (void)flags;
+    if (stream) return MF_E_INVALIDSTREAMNUMBER;
+    if (!s || !s->b) return E_INVALIDARG;
+    if (t->drained) { avcodec_flush_buffers(t->cc); mft_reset_parser(t); t->drained = 0; }    /* input after a drain: a new stream */
+    const uint8_t *data = s->b->data;
+    int left = (int)s->b->len;
+    while (left > 0) {
+        uint8_t *au = NULL; int au_len = 0;
+        int used = av_parser_parse2(t->parser, t->cc, &au, &au_len, data, left, s->time, AV_NOPTS_VALUE, 0);
+        if (used < 0) return E_FAIL;
+        data += used; left -= used;
+        if (au_len > 0) {                              /* a whole picture (with its parameter sets): to the decoder */
+            t->pkt->data = au; t->pkt->size = au_len; t->pkt->pts = t->parser->pts; t->pkt->dts = AV_NOPTS_VALUE;
+            mft_send(t, t->pkt);                       /* not reference counted: libavcodec copies the bytes */
+            av_packet_unref(t->pkt);
+        }
+        if (!used && !au_len) break;
+    }
+    return S_OK;
+}
+HRESULT IMFTransform_ProcessOutput(IMFTransform *t, DWORD flags, DWORD count, MFT_OUTPUT_DATA_BUFFER *ob, DWORD *status) {
+    (void)flags;
+    *status = 0;
+    if (!count || !ob) return E_INVALIDARG;
+    ob->pSample = NULL; ob->dwStatus = 0; ob->pEvents = NULL;
+    if (!t->out_set) return MF_E_TRANSFORM_TYPE_NOT_SET;
+    if (!t->qn) mft_receive(t);
+    if (!t->qn) return MF_E_TRANSFORM_NEED_MORE_INPUT;
+    AVFrame *f = t->q[0];
+    if (f->width != t->out_w || f->height != t->out_h) {        /* the stream's size: the caller takes the new output type */
+        t->out_w = f->width; t->out_h = f->height; t->out_set = 0;
+        ob->dwStatus = MFT_OUTPUT_DATA_BUFFER_FORMAT_CHANGE;
+        return MF_E_TRANSFORM_STREAM_CHANGE;
+    }
+    int w = f->width, h = f->height;
+    IMFSample *smp = sample_new((size_t)w * h + (size_t)w * ((h + 1) / 2));
+    if (!smp) return E_OUTOFMEMORY;
+    t->sws = sws_getCachedContext(t->sws, w, h, (enum AVPixelFormat)f->format, w, h, AV_PIX_FMT_NV12, SWS_POINT, NULL, NULL, NULL);
+    if (!t->sws) { IMFSample_Release(smp); return E_FAIL; }
+    uint8_t *dst[4] = {smp->b->data, smp->b->data + (size_t)w * h, NULL, NULL};
+    int pitch[4] = {w, w, 0, 0};
+    sws_scale(t->sws, (const uint8_t *const *)f->data, f->linesize, 0, h, dst, pitch);
+    int64_t ts = f->best_effort_timestamp != AV_NOPTS_VALUE ? f->best_effort_timestamp : f->pts;
+    smp->time = ts == AV_NOPTS_VALUE ? 0 : ts;
+    av_frame_free(&t->q[0]);
+    memmove(t->q, t->q + 1, (size_t)(t->qn - 1) * sizeof *t->q);
+    t->qn--;
+    ob->pSample = smp;
+    return S_OK;
 }
