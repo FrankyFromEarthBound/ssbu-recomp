@@ -12,7 +12,7 @@ import struct
 import sys
 import collections
 
-ELF = r'..\binaries\13.0.4\main.elf'
+ELF = '../binaries/13.0.4/main.elf'
 BASE = 0x7100000000
 FILE_OFF = 0x1000
 TEXT_SIZE = 0x39c7e90

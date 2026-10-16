@@ -244,6 +244,7 @@ static void speed_init(void) {
     if (g_lockstep) printf("display: SSBU_SPEED=%s: %s, one refresh per presented frame\n", e, g_speed > 0 ? "paced at n x 60 Hz" : "uncapped");
 }
 
+#ifdef _WIN32
 int oe_exit_request(void);                            /* nnmisc.c */
 static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
     if (m == WM_CLOSE) {                             /* the exit request: nn::oe decides (nnmisc.c oe_exit_request) whether the game ends now or after its exit-request handling section */
@@ -304,6 +305,53 @@ static DWORD WINAPI window_thread(LPVOID arg) {
     return 0;
 }
 
+#else
+/* Linux build: an SDL3 window (X11 or Wayland) made and serviced by its own thread, as the Win32 one is. Vulkan draws
+ * into it (nvn_vk.c makes the surface with SDL). The keyboard state that nnhid.c reads (GetAsyncKeyState, plat_posix.c)
+ * is SDL's, which this thread's event pumping keeps current; nnpad_sdl.c flushes the queue on its own thread, so the
+ * close request is caught by an event watch rather than read from the queue. */
+#include <SDL3/SDL.h>
+int oe_exit_request(void);                            /* nnmisc.c */
+static char g_title[96];
+static bool SDLCALL close_watch(void *user, SDL_Event *e) {
+    (void)user;
+    if (e->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED || e->type == SDL_EVENT_QUIT) {
+        static volatile LONG once;
+        if (InterlockedExchange(&once, 1)) return true;
+        printf("\nwindow closed by the user after %lld frames\n", (long long)g_frames);
+        if (!oe_exit_request()) report_and_exit(0);
+    }
+    return true;
+}
+static DWORD WINAPI window_thread(LPVOID arg) {
+    (void)arg;
+    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
+    SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) { printf("display: SDL video cannot start: %s\n", SDL_GetError()); fflush(stdout); ExitProcess(5); }
+    const GfxOptions *go = gfx_options();
+    int cw = go->width, ch = go->height;
+    SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE;
+    if (go->window_mode) {
+        const SDL_DisplayMode *dm = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+        if (dm) { cw = dm->w; ch = dm->h; }
+        flags |= go->window_mode == 2 ? SDL_WINDOW_FULLSCREEN : SDL_WINDOW_BORDERLESS;
+    }
+    printf("display: window %s, client %dx%d (graphics.ini), SDL video driver %s\n", go->window_mode == 2 ? "fullscreen" : go->window_mode ? "borderless" : "windowed", cw, ch, SDL_GetCurrentVideoDriver());
+    snprintf(g_title, sizeof g_title, "%s", getenv("SSBU_TITLE") ? getenv("SSBU_TITLE") : "SSBU native (study build)");
+    SDL_Window *w = SDL_CreateWindow(g_title, cw, ch, flags);
+    if (!w) { printf("display: SDL_CreateWindow failed: %s\n", SDL_GetError()); fflush(stdout); ExitProcess(5); }
+    SDL_AddEventWatch(close_watch, NULL);
+    g_hwnd = (HWND)w;
+    plat_game_window = (HWND)w;
+    InterlockedExchange(&g_ready, 1);
+    for (;;) {
+        SDL_Event e;
+        if (SDL_WaitEventTimeout(&e, 8)) { while (SDL_PollEvent(&e)) {} }       /* the watch saw them; the keyboard state is current */
+        plat_window_service();
+    }
+    return 0;
+}
+#endif
 /* Signals the guest's vsync event 60 times per second. */
 static DWORD WINAPI vsync_thread(LPVOID arg) {
     (void)arg;
@@ -377,6 +425,10 @@ static DWORD WINAPI vsync_thread(LPVOID arg) {
     }
 }
 static void vsync_test_key(void) {
+#ifndef _WIN32
+    {   static int said; if (!said && getenv("SSBU_AUTOKEY")) { said = 1; printf("display: SSBU_AUTOKEY is not available in the Linux build (use SSBU_SEQ)\n"); } }
+    return;
+#endif
     {
         /* Test aid: SSBU_AUTOKEY=<letter>,<first second>,<every n seconds> presses a key now and then, so a run without a person can get
          * past "press any button". Only while this window is the foreground window, so the key never reaches another program. */

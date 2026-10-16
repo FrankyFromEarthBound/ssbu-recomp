@@ -17,7 +17,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GEN = os.path.join(HERE, os.environ.get('RECOMP_GEN', 'gen_eh_o2'))      # side-by-side builds: RECOMP_GEN / RECOMP_OBJ / RECOMP_DLL / RECOMP_SHIM
 OBJ = os.path.join(HERE, os.environ.get('RECOMP_OBJ', 'obj_eh_o1'))
 CLANG = os.environ.get('RECOMP_CLANG', r'C:\llvm-8.0.0\bin\clang.exe')      # scripts\setup.py sets RECOMP_CLANG (LLVM/clang 9.0.0)
-CFLAGS = ['-c', '-O1', '-w', '-fno-strict-aliasing', '-I', HERE, '-I', GEN]
+# RECOMP_TARGET=linux: a native Linux build (ELF objects, the game and the modules as .so files, the exe linked with the
+# system's SDL3 / FreeType / OpenSSL / FFmpeg). The Win32 calls of the host sources come from plat/windows.h + plat_posix.c.
+TARGET_LINUX = os.environ.get('RECOMP_TARGET') == 'linux'
+PLAT_FLAGS = ['-fPIC', '-fvisibility=hidden', '-include', os.path.join(HERE, 'plat', 'plat_pre.h')] if TARGET_LINUX else []
+CFLAGS = ['-c', '-O1', '-w', '-fno-strict-aliasing', '-I', HERE, '-I', GEN] + PLAT_FLAGS
+
+
 HOST_SOURCES = ['hostrt.c', 'boot.c', 'nnsdk.c', 'libcxx.c', 'os_threads.c', 'nvn_stub.c', 'nvn_gl.c', 'nvn_vk.c', 'mx_translate.c', 'tex_decode.c', 'nnfs.c', 'clib.c', 'nntime.c', 'nnhid.c', 'nnpad_sdl.c','sdkdata.c', 'display.c', 'nnpl.c', 'nnfontll.c', 'nnmovie.c', 'nnmisc.c', 'nnaudio.c', 'nnro.c', 'nro_registry.c', 'nnmovie_mf.c', 'nniostream.c', 'nncxxrt.c', 'nncxxlib.c', 'nnlibc2.c',
                 'sdklift_gen.c', 'sdklift_rt.c', 'nnsdk2.c', 'nnmii.c', 'nnapplet.c', 'nnalbum.c', 'nnnet.c', 'nnfsdir.c', 'nnunwind.c', 'nvn_sdk.c', 'nvn_c4.c', 'nvn_c5.c', 'hitch.c', 'gfx_options.c', 'debug_mode.c', 'r1_state.c']
 # A handful of files hold functions so large that clang -O1 needs more than an hour on them;
@@ -77,6 +83,14 @@ HOST_FLAGS = ['-O1', '-g', '-w', '-fno-strict-aliasing', '-I', HERE, '-I', GEN, 
               '-I', os.path.join(os.environ.get('VULKAN_HEADERS', os.path.join(HERE, '..', 'reference', 'upstream', 'Vulkan-Headers')), 'include')]      # Khronos headers for nvn_vk.c (track V)
 SDL_DIR = os.path.join(os.environ.get('SDL3_ROOT', os.path.join(HERE, '..', 'reference', 'upstream', 'SDL3-3.4.18-VC', 'SDL3-3.4.18')), 'lib', 'x64')      # SDL3 for nnpad_sdl.c; SDL3.dll is copied beside the exe at link (SDL3_ROOT / VULKAN_HEADERS: scripts\setup.py)
 LIBS = ['-luser32', '-lgdi32', '-lwinmm', '-lmfplat', '-lmfreadwrite', '-lmfuuid', '-lole32', '-lshlwapi']
+if TARGET_LINUX:
+    def pkg(*args):
+        return subprocess.run(['pkg-config'] + list(args) + ['sdl3', 'freetype2', 'openssl', 'libavformat', 'libavcodec', 'libswscale', 'libswresample', 'libavutil'],
+                              capture_output=True, text=True, check=True).stdout.split()
+    _sdl_inc = HOST_FLAGS.index('-I', HOST_FLAGS.index('-Ddyn_sym_count=(*game_dyn_sym_count_p)'))      # the SDL3 VC package: the system's SDL3 instead
+    HOST_FLAGS = HOST_FLAGS[:_sdl_inc] + HOST_FLAGS[_sdl_inc + 2:] + PLAT_FLAGS + ['-I', os.path.join(HERE, 'plat')] + pkg('--cflags')
+    HOST_SOURCES = HOST_SOURCES + ['plat_posix.c', 'plat_mf.c']
+    LIBS = pkg('--libs') + ['-lGL', '-lm', '-ldl', '-lpthread']      # libGL: the OpenGL front end is linked (not used)
 
 
 def debug_link_flags(out):
@@ -90,7 +104,7 @@ def debug_link_flags(out):
 
 def build_game_dll():
     dll = os.path.join(HERE, GAME_DLL)
-    lib = dll[:-4] + '.lib'
+    lib = dll if TARGET_LINUX else dll[:-4] + '.lib'          # Linux: the exe links against the .so itself
     shim = os.path.join(HERE, os.environ.get('RECOMP_SHIM', 'game_shim_eh.c'))
     objs = sorted(os.path.join(OBJ, n) for n in os.listdir(OBJ) if n.endswith('.obj'))
     newest = max([os.path.getmtime(o) for o in objs] + [os.path.getmtime(shim)])
@@ -100,7 +114,8 @@ def build_game_dll():
     with open(rsp, 'w') as f:
         f.write('\n'.join('"%s"' % o.replace('\\', '/') for o in objs))
     t0 = time.time()
-    r = subprocess.run([CLANG, '-shared', '-O1', '-w', '-I', HERE, '-I', GEN, shim, '@' + rsp, '-o', dll], capture_output=True, text=True)
+    extra = PLAT_FLAGS + ['-lm', '-Wl,-soname,' + GAME_DLL, '-Wl,-z,now'] if TARGET_LINUX else []
+    r = subprocess.run([CLANG, '-shared', '-O1', '-w', '-I', HERE, '-I', GEN, shim, '@' + rsp, '-o', dll] + extra, capture_output=True, text=True)
     print((r.stdout + r.stderr)[-4000:])
     if r.returncode == 0:
         print('linked %s: %.0f MB in %.0fs' % (dll, os.path.getsize(dll) / 1048576.0, time.time() - t0))
@@ -140,8 +155,11 @@ def cmd_link():
                 print('FAILED %s\n%s' % (os.path.basename(src), err))
     if failed:
         return 1
-    r = subprocess.run([CLANG] + objs + [os.path.join(HERE, GAME_DLL[:-4] + '.lib'), os.path.join(SDL_DIR, 'SDL3.lib')] + LIBS + debug_link_flags(out) + ['-o', out], capture_output=True, text=True, errors='replace')
-    if r.returncode == 0:
+    if TARGET_LINUX:
+        r = subprocess.run([CLANG] + objs + ['-L', HERE, '-l:' + GAME_DLL, '-Wl,-rpath,$ORIGIN'] + LIBS + ['-o', out], capture_output=True, text=True, errors='replace')
+    else:
+        r = subprocess.run([CLANG] + objs + [os.path.join(HERE, GAME_DLL[:-4] + '.lib'), os.path.join(SDL_DIR, 'SDL3.lib')] + LIBS + debug_link_flags(out) + ['-o', out], capture_output=True, text=True, errors='replace')
+    if r.returncode == 0 and not TARGET_LINUX:
         import shutil
         shutil.copy2(os.path.join(SDL_DIR, 'SDL3.dll'), os.path.join(HERE, 'SDL3.dll'))
     print((r.stdout + r.stderr)[-4000:])                 # link.exe reports its errors on stdout

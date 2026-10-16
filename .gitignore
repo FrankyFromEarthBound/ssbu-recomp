@@ -63,7 +63,9 @@ trace_*.txt
 
 # everything scripts/setup.py produces from your dump, and tools you put in deps/
 build/
+build-linux/
 deps/
+/deps
 
 # local configuration
 config/

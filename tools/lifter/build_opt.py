@@ -27,6 +27,7 @@ target (SSE2), so no FMA / AVX instructions are selected.
 import os
 import re
 import subprocess
+import signal
 import sys
 import time
 
@@ -84,12 +85,15 @@ def optnone_header(src, obj, limit):
 
 def run_limited(cmd, limit):
     t = time.time()
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=(os.name != 'nt'))
     try:
         out, _ = p.communicate(timeout=limit)
         return p.returncode, out.decode('latin-1')[-2000:], time.time() - t
     except subprocess.TimeoutExpired:
-        subprocess.run(['taskkill', '/PID', str(p.pid), '/T', '/F'], capture_output=True)      # this compiler and its -cc1 child only
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/PID', str(p.pid), '/T', '/F'], capture_output=True)      # this compiler and its -cc1 child only
+        else:
+            os.killpg(p.pid, signal.SIGKILL)                     # the clang wrapper's process group
         p.communicate()
         return None, '', time.time() - t
 
@@ -131,7 +135,7 @@ def report(objdir):
 def compile_one_main(name):
     src = os.path.join(build.GEN, name)
     obj = os.path.join(build.OBJ, name[:-2] + '.obj')
-    code, out, secs, note = compile_file(src, obj, ['-w', '-fno-strict-aliasing', '-I', HERE, '-I', build.GEN])
+    code, out, secs, note = compile_file(src, obj, ['-w', '-fno-strict-aliasing', '-I', HERE, '-I', build.GEN] + build.PLAT_FLAGS)
     if note or secs > 60:
         line = '%-12s %6.0fs  %s' % (name, secs, note)
         _report.append(line)

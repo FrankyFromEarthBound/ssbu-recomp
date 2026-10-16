@@ -12,6 +12,9 @@ python scripts/setup.py --dump <your dump folder> --suyu <folder> [--llvm ... --
 
 One command, eleven resumable steps. When it ends it prints how to start the game.
 
+**On Linux**, see [BUILDING_LINUX.md](BUILDING_LINUX.md): a native build with `scripts/linux/install_deps.sh` and
+`setup.py --target linux`. This file describes the Windows build.
+
 ## What you need
 
 | Requirement | Version tested | Where from |

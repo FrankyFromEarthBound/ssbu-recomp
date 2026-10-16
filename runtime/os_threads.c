@@ -219,6 +219,31 @@ void dump_guest_threads(FILE *out) {
     }
 }
 
+/* Freeze report (nvn_vk_wd.c): every guest thread, the host import it is blocked in, and the state of the nn::os object
+ * its first argument names (looked up without creating one). A worker thread listed as "finished" that should run
+ * forever, or a wait on an object that is signaled, points at the cause. */
+static Obj *obj_peek(uint64_t key) {
+    unsigned h = (unsigned)((key >> 3) * 2654435761u) & (BUCKETS - 1);
+    AcquireSRWLockShared(&g_table_lock);
+    Obj *o = g_table[h];
+    while (o && o->key != key) o = o->next;
+    ReleaseSRWLockShared(&g_table_lock);
+    return o;
+}
+void os_wait_report(FILE *out) {
+    fprintf(out, "  guest threads (blocking import, its first argument, the state of that nn::os object):\n");
+    for (int i = 0; i < g_threads_n && i < 256; i++) {
+        Obj *o = g_threads[i].o;
+        Ctx *c = g_threads[i].c;
+        if (!o || !c) continue;
+        fprintf(out, "    %-28s %s f_%llx lr=%llx %s x0=%llx", o->name ? (const char *)(uintptr_t)o->name : "?", o->finished ? "FINISHED" : "running ",
+                (unsigned long long)c->fn, (unsigned long long)c->x[30], c->in_import ? c->in_import : "(guest code)", (unsigned long long)c->x[0]);
+        Obj *w = !o->finished && c->in_import && c->x[0] > 0x10000 ? obj_peek(c->x[0]) : NULL;
+        if (w) fprintf(out, " -> signaled %d autoclear %d count %d", w->signaled, w->autoclear, w->count);
+        fputc('\n', out);
+    }
+}
+
 /* hitch.c (SSBU_HITCH): guest thread i -> context, name, host handle; 0 past the end. */
 int guest_thread_info(int i, Ctx **c, const char **name, HANDLE *h) {
     if (i < 0 || i >= g_threads_n || i >= 256 || !g_threads[i].o || !g_threads[i].c) return 0;
@@ -460,7 +485,11 @@ static void mtx_lock(Ctx *c) {
 static void mtx_unlock(Ctx *c) { LeaveCriticalSection(&obj(A0)->cs); }
 static void mtx_trylock(Ctx *c) { RET(TryEnterCriticalSection(&obj(A0)->cs) ? 1 : 0); }
 /* hitch.c (SSBU_HITCH): host thread id that owns the guest mutex `key` now, 0 = nobody. Diagnostics only. */
+#ifdef _WIN32
 DWORD os_mutex_owner(uint64_t key) { return key ? (DWORD)(uintptr_t)obj(key)->cs.OwningThread : 0; }
+#else
+DWORD os_mutex_owner(uint64_t key) { return key ? (DWORD)obj(key)->cs.__data.__owner : 0; }     /* glibc: the owner's tid */
+#endif
 static void pmtx_lock(Ctx *c) { EnterCriticalSection(&obj(A0)->cs); RET(0); }
 static void pmtx_unlock(Ctx *c) { LeaveCriticalSection(&obj(A0)->cs); RET(0); }
 static void pmtx_trylock(Ctx *c) { RET(TryEnterCriticalSection(&obj(A0)->cs) ? 0 : 16); }   /* EBUSY */

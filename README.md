@@ -1,7 +1,7 @@
 # ssbu-recomp
 
 A **static recompilation** of *Super Smash Bros. Ultimate* (version 13.0.4) from the Nintendo Switch to a
-native Windows x64 program, with its own runtime, a Vulkan renderer, and tools to turn the fighters' script
+native Windows x64 program (and a native Linux one, see [BUILDING_LINUX.md](BUILDING_LINUX.md)), with its own runtime, a Vulkan renderer, and tools to turn the fighters' script
 code back into readable, editable C++.
 
 It is **not an emulator**: there is no CPU interpreter and no JIT. The game's AArch64 machine code is
@@ -41,7 +41,7 @@ something was not checked, it says so.
 | New fighter kinds | a 95th fighter kind fights as a copy of an existing fighter, on a separately built game DLL produced by a patch list (`tools/lifter/patches/`, 175 instruction patches in 73 functions; the default build is untouched); own kind hash, own parameter-table rows and a roster row work. Own files and own moves are **in progress**: a fighter under its own file name does not load yet. See [docs/NEW_FIGHTER.md](docs/NEW_FIGHTER.md) |
 | Matching decompilation | paused |
 | Rollback netcode | planned, not started |
-| Linux / Steam Deck | not started (the runtime is Windows-only today) |
+| Linux | **native build works** (October 2026): built and played on one PC (CachyOS, NVIDIA, Wayland): movie, menus, a whole scripted match at 60 fps with sound. Vulkan only; album movie recording not implemented; other distributions, GPUs and the Steam Deck not tested. One script installs the dependencies, the same `setup.py` builds it: [BUILDING_LINUX.md](BUILDING_LINUX.md) |
 | Building from a fresh clone | **verified** (October 2026): `python scripts/setup.py --dump <your dump> ...` builds a running game in about 45 minutes and passes the scripted match; see [BUILDING.md](BUILDING.md) |
 
 ## How it works
@@ -100,7 +100,7 @@ rules) is being converted with a second, general decompiler.
 
 ## Features
 
-- Native Windows x64 executable; no CPU emulation at run time
+- Native Windows x64 executable, and a native Linux build; no CPU emulation at run time
 - Vulkan renderer (pipelines prepared on worker threads, driver cache on disk) and an OpenGL renderer
 - Options in `config/graphics.ini`: renderer, window / borderless / fullscreen, size, vsync mode, GPU
   choice, anisotropic filtering, frame-time line (internal resolution scale: in progress)
@@ -123,12 +123,13 @@ rules) is being converted with a second, general decompiler.
 
 ## Requirements
 
-To run: Windows 10/11 x64, a GPU with a Vulkan 1.3 driver, your own dump of the game (version 13.0.4).
+To run: Windows 10/11 x64 or Linux (x86-64), a GPU with a Vulkan 1.3 driver, your own dump of the game (version 13.0.4).
 
 To build: Python 3.10+ (numpy, lz4, zstandard, Pillow, unicorn), LLVM/clang 9.0.0, MSVC Build Tools with a Windows SDK,
 SDL3 (VC development package), Khronos Vulkan-Headers, glslang (Windows release), a yuzu-family source checkout for the
 self-test reference data, libopus as a DLL (for the music; without it the game runs silent), and your dump. Exact
 versions, links and the one command: [BUILDING.md](BUILDING.md).
+On Linux: `scripts/linux/install_deps.sh` installs everything (clang 19+, SDL3, FFmpeg, ...); see [BUILDING_LINUX.md](BUILDING_LINUX.md).
 
 ## Repository layout
 

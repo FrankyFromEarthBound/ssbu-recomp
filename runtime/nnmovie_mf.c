@@ -70,6 +70,8 @@
  * re-synchronise (pause, seek, resume) the movie at the n-th video sample, see dec_SendInputBufferForDecode;
  * SSBU_MOVIE_SAVE_H264=<file> saves the H.264 stream a final smash movie sends; SSBU_MOVIE_H264_TEST=<file> (test only)
  * decodes such a file through the H.264 path the way the game drives it and exits, see h264_selftest. */
+/* Linux build: the Media Foundation calls below go to plat/mfapi.h: a source reader and an H.264 decoder transform on FFmpeg
+ * (plat_mf.c). */
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>

@@ -2,7 +2,7 @@
 tables, nn::hid ids) out of the real `sdk` binary, and emit them as C arrays in sdkdata.c."""
 import struct
 
-SDK = r'..\binaries\13.0.4\sdk.elf'
+SDK = '../binaries/13.0.4/sdk.elf'
 d = open(SDK, 'rb').read()
 OFF = 0x1000
 # locate .dynsym / .dynstr through the section headers nso2elf wrote

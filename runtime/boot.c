@@ -160,6 +160,7 @@ static DWORD WINAPI profiler(LPVOID arg) {
                 printf("[prof] f_%llx lr %llx: %u\n", (unsigned long long)g_prof[j].callee, (unsigned long long)g_prof[j].caller, g_prof[j].n);
         return 0;
     }
+#ifdef _WIN32      /* Linux build: no other thread's context to sample (no SuspendThread) */
     while (GetTickCount64() < end) {
         CONTEXT ctx;
         uint64_t chain[64];
@@ -189,6 +190,7 @@ static DWORD WINAPI profiler(LPVOID arg) {
         }
         for (ULONGLONG t0 = GetTickCount64(); GetTickCount64() - t0 < 1;) YieldProcessor();
     }
+#endif
     printf("\n[prof] %u samples of the main thread (callee <- caller: samples)\n", samples);
     for (int j = 0; j < g_prof_used; j++)
         printf("[prof] f_%llx <- f_%llx: %u\n", (unsigned long long)g_prof[j].callee, (unsigned long long)g_prof[j].caller, g_prof[j].n);
@@ -519,6 +521,7 @@ int main(int argc, char **argv) {
                     n = rd64(n);
                 }
             }
+#ifdef _WIN32
             /* where is the main host thread really? sample its instruction pointer and unwind */
             for (int s = 0; s < 3; s++) {
                 Sleep(50);
@@ -543,6 +546,7 @@ int main(int argc, char **argv) {
                 printf("\n");
                 ResumeThread(t);
             }
+#endif
             for (int s = 0; s < 8; s++) {            /* is it moving? sample a few times */
                 Sleep(37);
                 printf("  sample %d: f_%llx lr=%llx x0=%llx x1=%llx x8=%llx x9=%llx x11=%llx x12=%llx\n", s,

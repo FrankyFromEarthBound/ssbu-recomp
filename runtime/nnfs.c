@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
+#include <io.h>
 #include "runtime.h"
 #include "hostrt.h"
 
