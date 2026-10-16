@@ -41,6 +41,8 @@ tools/lifter/quad_tests.h
 
 # fighter sources generated from the game's script modules
 fighters/
+# ...but docs/game/fighters/ holds our own write-ups about fighters (names and addresses only), not generated source
+!/docs/game/fighters/
 fighters_bin*/
 fighter_sdk/include/lua_const.h
 fighter_sdk/include/lua_bind.h

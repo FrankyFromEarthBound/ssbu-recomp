@@ -18,6 +18,7 @@ game's files. Anything more detailed is produced on your PC by `tools/audit/game
 | [CODE_MAP.md](CODE_MAP.md) | What lives where in main's 58 MB of code, region by region, and how much of it has a name |
 | [SUBSYSTEMS.md](SUBSYSTEMS.md) | The engine's parts (threads, jobs, resources, scripts, fighters, audio, movies, rendering, network) with the addresses that anchor each |
 | [NAMING_PLAN.md](NAMING_PLAN.md) | Where more names can come from, and a proposed order for cleaning up |
+| [fighters/](fighters/README.md) | One page per fighter: where its code is and how its moves are built (first: Mr. Game & Watch) |
 | [KNOWN_ADDRESSES.md](KNOWN_ADDRESSES.md) | Generated: every game address our own sources mention, with a link to each place |
 
 ## How a claim is marked
