@@ -138,11 +138,11 @@ versions, links and the one command: [BUILDING.md](BUILDING.md).
 | `tools/lifter/` | AArch64 → C recompiler, build scripts, differential tests |
 | `tools/nro/` | the same for the game's script modules |
 | `tools/extract/` | reading your dump |
-| `tools/audit/` | the "what is really implemented" audit |
+| `tools/audit/` | the "what is really implemented" audit; `game_index.py` (an index of the game's code, made from your dump) |
 | `fighter_sdk/` | fighter script decompilers, the C++ SDK and runtime for fighter source, the hook API |
 | `mods/` | small test mods (C++ source) for the hook API and the new-fighter experiments |
 | `tests/` | scripted input sequences, test drivers and measuring scripts (`DEBUG_MODE.md` documents the test modes) |
-| `docs/` | `MODDING.md` (mods and fighter source), `NEW_FIGHTER.md` (what a new fighter needs, what works) |
+| `docs/` | `MODDING.md` (mods and fighter source), `NEW_FIGHTER.md` (what a new fighter needs, what works), `game/` (what is known about the game's code: map, subsystems, naming plan) |
 
 ## Related work
 
