@@ -2,7 +2,8 @@
  *
  * Path: SSBU_GRAPHICS_CONFIG=<file> when set; else graphics.ini beside the file SSBU_CONFIG names (SSBU_CONFIG is the
  * path of controllers.ini, nnpad_sdl.c); else <exe folder>\..\config\graphics.ini. Written with the defaults and their
- * documentation when it does not exist. Read ONCE at start (the window, the device and the swapchain are made from it).
+ * documentation when it does not exist. Read once at start; window, anisotropic_filtering and frame_time_overlay can also
+ * be changed while the game runs (gfx_options_set, from the Options > Graphics page); the resolution scale and vsync cannot.
  * Environment switches of the test scripts (SSBU_RENDERER, SSBU_VK_DEVICE, SSBU_VK_PRESENT) win over the file.
  * The controllers.ini reader of nnpad_sdl.c is built around its device sections and is not reusable here: this file has
  * its own 30-line reader (key = value, ';' or '#' comments, section headers ignored). */
@@ -143,6 +144,26 @@ static void opt_path(char *out) {
     snprintf(tmp, sizeof tmp, "%s\\..\\config\\graphics.ini", exe);
     if (!_fullpath(out, tmp, MAX_PATH)) snprintf(out, MAX_PATH, "%s", tmp);
 }
+/* One "key = value" of the file into o; 0 when the key is not one of ours. */
+static int opt_set(GfxOptions *o, const char *key, const char *val) {
+    if (!_stricmp(key, "renderer")) o->renderer = !_stricmp(val, "opengl") || !_stricmp(val, "gl");
+    else if (!_stricmp(key, "window")) o->window_mode = !_stricmp(val, "borderless") ? 1 : !_stricmp(val, "fullscreen") ? 2 : 0;
+    else if (!_stricmp(key, "width")) { int v = atoi(val); if (v >= 320 && v <= 16384) o->width = v; }
+    else if (!_stricmp(key, "height")) { int v = atoi(val); if (v >= 180 && v <= 16384) o->height = v; }
+    else if (!_stricmp(key, "vsync")) o->present = !_stricmp(val, "on") ? 1 : !_stricmp(val, "off") ? 2 : !_stricmp(val, "mailbox") ? 3 : !_stricmp(val, "display") ? 4 : !_stricmp(val, "auto") ? 5 : 0;
+    else if (!_stricmp(key, "gpu")) { if (_stricmp(val, "auto")) snprintf(o->gpu, sizeof o->gpu, "%s", val); }
+    else if (!_stricmp(key, "console_mode")) o->handheld = !_stricmp(val, "handheld");
+    else if (!_stricmp(key, "resolution_scale")) { float v = (float)atof(val); if (v > 0) o->scale = v; }
+    else if (!_stricmp(key, "anisotropic_filtering")) { int v = atoi(val); o->aniso = v == 2 || v == 4 || v == 8 || v == 16 ? v : 0; }
+    else if (!_stricmp(key, "frame_time_overlay")) o->overlay = !_stricmp(val, "on") || !strcmp(val, "1");
+    else if (!_stricmp(key, "profile")) o->profile = !_stricmp(val, "low");
+    else if (!_stricmp(key, "shader_wait")) o->shader_skip = !_stricmp(val, "skip");
+    else if (!_stricmp(key, "runahead")) g_gfx_runahead = !_stricmp(val, "on") || !_stricmp(val, "1");      /* track R1 round 5 (r1_state.c) */
+    else if (!_stricmp(key, "latency")) g_gfx_latency = !_stricmp(val, "lowest") ? 2 : !_stricmp(val, "low") ? 1 : 0;      /* track L1 (display.c latency_mode) */
+    else if (!_stricmp(key, "shader_prepare")) o->shader_prepare = !_stricmp(val, "background") ? 1 : !_stricmp(val, "off") ? 2 : 0;
+    else return 0;
+    return 1;
+}
 static BOOL CALLBACK opt_load(PINIT_ONCE once, PVOID arg, PVOID *ctx) {
     (void)once; (void)arg; (void)ctx;
     GfxOptions *o = &g_opt;
@@ -165,22 +186,7 @@ static BOOL CALLBACK opt_load(PINIT_ONCE once, PVOID arg, PVOID *ctx) {
         if (!line[0] || line[0] == ';' || line[0] == '#' || line[0] == '[' || !(eq = strchr(line, '='))) continue;
         *eq = 0; val = eq + 1;
         trim(key); trim(val);
-        if (!_stricmp(key, "renderer")) o->renderer = !_stricmp(val, "opengl") || !_stricmp(val, "gl");
-        else if (!_stricmp(key, "window")) o->window_mode = !_stricmp(val, "borderless") ? 1 : !_stricmp(val, "fullscreen") ? 2 : 0;
-        else if (!_stricmp(key, "width")) { int v = atoi(val); if (v >= 320 && v <= 16384) o->width = v; }
-        else if (!_stricmp(key, "height")) { int v = atoi(val); if (v >= 180 && v <= 16384) o->height = v; }
-        else if (!_stricmp(key, "vsync")) o->present = !_stricmp(val, "on") ? 1 : !_stricmp(val, "off") ? 2 : !_stricmp(val, "mailbox") ? 3 : !_stricmp(val, "display") ? 4 : !_stricmp(val, "auto") ? 5 : 0;
-        else if (!_stricmp(key, "gpu")) { if (_stricmp(val, "auto")) snprintf(o->gpu, sizeof o->gpu, "%s", val); }
-        else if (!_stricmp(key, "console_mode")) o->handheld = !_stricmp(val, "handheld");
-        else if (!_stricmp(key, "resolution_scale")) { float v = (float)atof(val); if (v > 0) o->scale = v; }
-        else if (!_stricmp(key, "anisotropic_filtering")) { int v = atoi(val); o->aniso = v == 2 || v == 4 || v == 8 || v == 16 ? v : 0; }
-        else if (!_stricmp(key, "frame_time_overlay")) o->overlay = !_stricmp(val, "on") || !strcmp(val, "1");
-        else if (!_stricmp(key, "profile")) o->profile = !_stricmp(val, "low");
-        else if (!_stricmp(key, "shader_wait")) o->shader_skip = !_stricmp(val, "skip");
-        else if (!_stricmp(key, "runahead")) g_gfx_runahead = !_stricmp(val, "on") || !_stricmp(val, "1");      /* track R1 round 5 (r1_state.c) */
-        else if (!_stricmp(key, "latency")) g_gfx_latency = !_stricmp(val, "lowest") ? 2 : !_stricmp(val, "low") ? 1 : 0;      /* track L1 (display.c latency_mode) */
-        else if (!_stricmp(key, "shader_prepare")) o->shader_prepare = !_stricmp(val, "background") ? 1 : !_stricmp(val, "off") ? 2 : 0;
-        else unknown++;
+        unknown += !opt_set(o, key, val);
     }
     if (f) fclose(f);
     if (o->profile == 1) {       /* the low-end profile wins over the three keys it sets, wherever they stand in the file (values: O1_options.md, session 9) */
@@ -200,4 +206,18 @@ static BOOL CALLBACK opt_load(PINIT_ONCE once, PVOID arg, PVOID *ctx) {
 const GfxOptions *gfx_options(void) {
     InitOnceExecuteOnce(&g_once, opt_load, NULL, NULL);
     return &g_opt;
+}
+/* A setting changed while the game runs (the Options > Graphics page, recomp_menu.c; the file is written by the caller).
+ * Returns the GFX_CHANGED_* bits of what differs from before; the caller asks the parts concerned to apply it. With
+ * profile = low the three keys the profile sets keep the profile's values (as at start). runahead and latency are
+ * set as read (their readers take them when they next look). */
+unsigned gfx_options_set(const char *key, const char *val) {
+    GfxOptions n = *gfx_options(), *o = &g_opt;
+    if (!opt_set(&n, key, val)) return 0;
+    if (o->profile == 1) { n.scale = o->scale; n.aniso = o->aniso; n.present = o->present; }
+    unsigned changed = (n.window_mode != o->window_mode ? GFX_CHANGED_WINDOW : 0) | (n.aniso != o->aniso ? GFX_CHANGED_ANISO : 0) |
+                       (n.overlay != o->overlay ? GFX_CHANGED_OVERLAY : 0) | (n.scale != o->scale || n.present != o->present ? GFX_CHANGED_RESTART : 0);
+    o->window_mode = n.window_mode; o->aniso = n.aniso; o->overlay = n.overlay;
+    /* the scale and vsync stay as at start: the images were made with the scale, and vsync also chose the frame pacing (display.c pace_options) */
+    return changed;
 }

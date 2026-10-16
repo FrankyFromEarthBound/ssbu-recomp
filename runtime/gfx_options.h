@@ -17,4 +17,9 @@ typedef struct {
     int shader_prepare;     /* track V session 14 (appended: older objects keep their offsets): 0 first_run (the game is held at its first frame until every shader of the game's data is prepared, once per GPU + driver), 1 background (as before), 2 off;  env SSBU_VK_PREPARE wins */
 } GfxOptions;
 const GfxOptions *gfx_options(void);      /* any thread; read once (the file is written with defaults when it does not exist) */
+#define GFX_CHANGED_WINDOW  1u
+#define GFX_CHANGED_ANISO   4u
+#define GFX_CHANGED_OVERLAY 8u
+#define GFX_CHANGED_RESTART 16u            /* a setting that takes effect at the next start (resolution_scale, vsync) */
+unsigned gfx_options_set(const char *key, const char *val);   /* while running: window, anisotropic_filtering, frame_time_overlay */
 #endif

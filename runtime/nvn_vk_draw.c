@@ -900,13 +900,14 @@ static VkImageView vt_view(VTex *vt, const EView *e, int dim, int attach) {
 }
 
 /* ---------------------------------------------------------------- samplers (shared by value, never deleted before shutdown) */
-static struct { SamplerParams p; VkSampler s; } g_smp[2048];
+static struct { SamplerParams p; int aniso_opt; VkSampler s; } g_smp[2048];      /* aniso_opt: graphics.ini anisotropic_filtering when it was made (it can change while running) */
 static int g_nsmp;
 static VkSampler g_smp_default;
 static VkSampler sampler_get(const SamplerParams *p) {
     static const VkSamplerAddressMode wrap[8] = {VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE, VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
                                                  VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
-    for (int i = 0; i < g_nsmp; i++) if (!memcmp(&g_smp[i].p, p, sizeof *p)) return g_smp[i].s;
+    int aniso_opt = gfx_options()->aniso;
+    for (int i = 0; i < g_nsmp; i++) if (g_smp[i].aniso_opt == aniso_opt && !memcmp(&g_smp[i].p, p, sizeof *p)) return g_smp[i].s;
     VkSamplerCreateInfo ci = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
     VkSamplerCustomBorderColorCreateInfoEXT cb = {VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT};
     VkSamplerReductionModeCreateInfo red = {VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO};
@@ -920,8 +921,8 @@ static VkSampler sampler_get(const SamplerParams *p) {
     float aniso = p->aniso;
     {   /* track O: anisotropic_filtering in graphics.ini = at least that on samplers that filter linearly between mip levels (not shadow-compare samplers) */
         static LONG64 raised;
-        float want = (float)gfx_options()->aniso;
-        if (want > aniso && minf >= 4 && p->cmode != 1) { aniso = want; raised++; if (raised == 1 || raised % 100 == 0) printf("nvn_vk: anisotropic_filtering=%d: %lld samplers raised so far (this one from %.0f)\n", gfx_options()->aniso, (long long)raised, p->aniso); }
+        float want = (float)aniso_opt;
+        if (want > aniso && minf >= 4 && p->cmode != 1) { aniso = want; raised++; if (raised == 1 || raised % 100 == 0) printf("nvn_vk: anisotropic_filtering=%d: %lld samplers raised so far (this one from %.0f)\n", aniso_opt, (long long)raised, p->aniso); }
     }
     if (aniso > 1.0f && D.f2.features.samplerAnisotropy) { ci.anisotropyEnable = VK_TRUE; ci.maxAnisotropy = aniso > V.props.limits.maxSamplerAnisotropy ? V.props.limits.maxSamplerAnisotropy : aniso; }
     if (p->cmode == 1) { ci.compareEnable = VK_TRUE; ci.compareOp = (VkCompareOp)(p->cfunc ? (p->cfunc - 1) & 7 : 7); }
@@ -952,7 +953,8 @@ static VkSampler sampler_get(const SamplerParams *p) {
     VkSampler s;
     VKC(vkCreateSampler(V.device, &ci, NULL, &s));
     if (g_nsmp == 2048) vkd_fail("more than 2048 distinct samplers");
-    g_smp[g_nsmp].p = *p; g_smp[g_nsmp++].s = s;
+    { static int last_opt = -1; if (aniso_opt != last_opt) { if (last_opt >= 0) printf("nvn_vk: anisotropic_filtering changed to %d while running: samplers are made again as textures are drawn\n", aniso_opt); last_opt = aniso_opt; } }
+    g_smp[g_nsmp].p = *p; g_smp[g_nsmp].aniso_opt = aniso_opt; g_smp[g_nsmp++].s = s;
     return s;
 }
 
@@ -3297,6 +3299,9 @@ swap: ;
     g_isem = (g_isem + 1) % 8;
     if (!g_sem[g_isem][0]) { VkSemaphoreCreateInfo smi = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO}; VKC(vkCreateSemaphore(V.device, &smi, NULL, &g_sem[g_isem][0])); VKC(vkCreateSemaphore(V.device, &smi, NULL, &g_sem[g_isem][1])); }
     VkSemaphore acq = g_sem[g_isem][0], rend = g_sem[g_isem][1];
+    if (InterlockedExchange(&g_vk_remake, 0) && V.swapchain) {      /* the window changed (nvn_vk.c nvn_vk_remake_swapchain) */
+        cmd_wait_all(); swapchain_destroy(); InterlockedIncrement64(&g_vk_recreated);
+    }
     int ok = V.swapchain || swapchain_create();
     InterlockedIncrement64(&g_wd_try);
     if (ok) {

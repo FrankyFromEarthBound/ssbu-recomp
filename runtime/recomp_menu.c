@@ -10,7 +10,8 @@
  * Lua binding is [game] 0x710336e510. Its hook here takes labels that start with "recomp_" and plays nothing:
  *     recomp_open                  Graphics was chosen on the Options screen: the script then leaves with
  *                                  the Smash options' id, and that screen's script is served from @recomp_page
- *     recomp_set:<key>=<value>;... the page's choices: written into graphics.ini (read at the next start)
+ *     recomp_set:<key>=<value>;... the page's choices: written into graphics.ini and applied at once (window,
+ *                                  texture filtering, frame time); the resolution scale and vsync at the next start
  * The current values reach the page the other way: its script holds a string constant "@@RECOMP_VALUES@@" padded
  * with spaces, which is overwritten (same length) in the served bytes with "key=value;..." from graphics.ini.
  * The page flag is cleared when the Options screen's own script is served again (the page was left).
@@ -26,6 +27,7 @@
 typedef void (*HookFn)(Ctx *c, void *user);
 int hook_install(uint64_t addr, HookFn repl, void *user, ImportFn *orig);      /* fighter_sdk/hook_host.c (in nnro.c) */
 void loose_host_callbacks(int (*condition)(const char *), void (*served)(const char *, uint8_t *, uint32_t));
+void display_set_window_mode(int mode);                                        /* display.c */
 
 #define FN_PLAY_SE_LABEL 0x710336e510ull     /* Lua binding of UiSoundManager:play_se_label(self, label) */
 #define PAGE_SCRIPT "ui/script/menu/option/option_melee_top.lc"
@@ -37,7 +39,7 @@ static volatile LONG g_page;                 /* 1: the next Smash options screen
 
 /* the keys the page shows, with the value the file has (or the default) */
 static const char *const k_keys[] = {"window", "resolution_scale", "vsync", "anisotropic_filtering", "frame_time_overlay", "shader_wait"};
-static const char *const k_defaults[] = {"windowed", "1.0", "clock", "game", "off", "hold"};
+static const char *const k_defaults[] = {"windowed", "1.0", "auto", "game", "off", "hold"};
 #define NKEYS (int)(sizeof k_keys / sizeof k_keys[0])
 
 static void rm_trim(char *s) {
@@ -112,6 +114,12 @@ static int write_values(const char *assign) {
     if ((f = fopen(path, "wb")) != NULL) { ok = fwrite(out, 1, len, f) == len; fclose(f); }
     free(out);
     printf("recomp menu: %d setting(s) written to %s%s: %s\n", n, path, ok ? "" : " (FAILED)", assign);
+    /* and applied now where the program can: window, texture filtering, frame time; the resolution scale and vsync at the next start */
+    unsigned changed = 0;
+    for (int k = 0; k < n; k++) changed |= gfx_options_set(keys[k], vals[k]);
+    if (changed & GFX_CHANGED_WINDOW) display_set_window_mode(gfx_options()->window_mode);
+    printf("recomp menu: applied now:%s%s%s%s%s\n", changed & GFX_CHANGED_WINDOW ? " window" : "", changed & GFX_CHANGED_ANISO ? " texture filtering (textures drawn from now on)" : "", changed & GFX_CHANGED_OVERLAY ? " frame time" : "",
+           !(changed & ~GFX_CHANGED_RESTART) ? " nothing" : "", changed & GFX_CHANGED_RESTART ? "; the resolution scale and vsync take effect at the next start" : "");
     return ok;
 }
 

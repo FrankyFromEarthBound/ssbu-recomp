@@ -266,6 +266,27 @@ static void speed_init(void) {
 
 #ifdef _WIN32
 int oe_exit_request(void);                            /* nnmisc.c */
+void nvn_vk_remake_swapchain(void);                   /* nvn_vk.c */
+/* A window mode chosen while running (0 windowed, 1 borderless, 2 fullscreen; the Options > Graphics page): the same
+ * window as at start, made over by the window's own thread. NOT TESTED on Windows (written with the Linux one). */
+static void apply_window_mode(HWND h, int mode) {
+    const GfxOptions *go = gfx_options();
+    MONITORINFO mi;
+    memset(&mi, 0, sizeof mi); mi.cbSize = sizeof mi;
+    GetMonitorInfoA(MonitorFromWindow(h, MONITOR_DEFAULTTOPRIMARY), &mi);
+    DWORD style = mode ? WS_POPUP : WS_OVERLAPPEDWINDOW;
+    SetWindowLongPtrA(h, GWL_STYLE, (LONG_PTR)(style | WS_VISIBLE));
+    if (mode) SetWindowPos(h, mode == 2 ? HWND_TOPMOST : HWND_NOTOPMOST, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+    else {
+        RECT r = {0, 0, go->width, go->height};
+        AdjustWindowRect(&r, style, FALSE);
+        int ww = r.right - r.left, wh = r.bottom - r.top;
+        SetWindowPos(h, HWND_NOTOPMOST, mi.rcWork.left + (mi.rcWork.right - mi.rcWork.left - ww) / 2, mi.rcWork.top + (mi.rcWork.bottom - mi.rcWork.top - wh) / 2, ww, wh, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+    }
+    printf("display: window mode changed in the options: %s\n", mode == 2 ? "fullscreen" : mode ? "borderless" : "windowed");
+    nvn_vk_remake_swapchain();
+}
+void display_set_window_mode(int mode) { if (g_hwnd) PostMessageA(g_hwnd, WM_APP + 1, (WPARAM)mode, 0); }
 static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
     if (m == WM_CLOSE) {                             /* the exit request: nn::oe decides (nnmisc.c oe_exit_request) whether the game ends now or after its exit-request handling section */
         printf("\nwindow closed by the user after %lld frames\n", (long long)g_frames);
@@ -274,6 +295,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
         return 0;
     }
     if (m == WM_ERASEBKGND) return 1;
+    if (m == WM_APP + 1) { apply_window_mode(h, (int)w); return 0; }      /* display_set_window_mode */
     return DefWindowProcA(h, m, w, l);
 }
 
@@ -333,8 +355,32 @@ static DWORD WINAPI window_thread(LPVOID arg) {
 #include <SDL3/SDL.h>
 int oe_exit_request(void);                            /* nnmisc.c */
 static char g_title[96];
+void nvn_vk_remake_swapchain(void);                   /* nvn_vk.c */
+static volatile LONG g_win_mode_req = -1;
+/* A window mode chosen while running (0 windowed, 1 borderless, 2 fullscreen; the Options > Graphics page), applied by
+ * the window thread below: SDL wants a window changed by the thread that made it. */
+void display_set_window_mode(int mode) { InterlockedExchange(&g_win_mode_req, mode); }
+static void apply_window_mode(SDL_Window *w, int mode) {
+    const GfxOptions *go = gfx_options();
+    /* borderless and fullscreen: SDL's desktop fullscreen (no mode change). A borderless window of the display's size is
+     * not possible on Wayland, where the compositor and not the program sizes and places windows (measured 2026-10-15:
+     * asked for the display's size, the window kept its own) */
+    if (mode) { SDL_SetWindowBordered(w, false); SDL_SetWindowFullscreenMode(w, NULL); SDL_SetWindowFullscreen(w, true); }
+    else {
+        SDL_SetWindowFullscreen(w, false);
+        SDL_SetWindowBordered(w, true);
+        SDL_SetWindowSize(w, go->width, go->height);
+        SDL_SetWindowPosition(w, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    }
+    SDL_SyncWindow(w);
+    int pw = 0, ph = 0;
+    SDL_GetWindowSizeInPixels(w, &pw, &ph);
+    printf("display: window mode changed in the options: %s, %dx%d pixels\n", mode == 2 ? "fullscreen" : mode ? "borderless" : "windowed", pw, ph);
+    nvn_vk_remake_swapchain();
+}
 static bool SDLCALL close_watch(void *user, SDL_Event *e) {
     (void)user;
+    if (e->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) nvn_vk_remake_swapchain();       /* Wayland does not always say so through the swapchain */
     if (e->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED || e->type == SDL_EVENT_QUIT) {
         static volatile LONG once;
         if (InterlockedExchange(&once, 1)) return true;
@@ -368,6 +414,8 @@ static DWORD WINAPI window_thread(LPVOID arg) {
         SDL_Event e;
         if (SDL_WaitEventTimeout(&e, 8)) { while (SDL_PollEvent(&e)) {} }       /* the watch saw them; the keyboard state is current */
         plat_window_service();
+        LONG m = InterlockedExchange(&g_win_mode_req, -1);
+        if (m >= 0) apply_window_mode(w, (int)m);
     }
     return 0;
 }

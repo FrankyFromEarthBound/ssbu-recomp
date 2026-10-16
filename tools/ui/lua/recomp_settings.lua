@@ -4,7 +4,8 @@
 --
 -- Five rows: each row's title shows "setting: < value >", left / right change the value; B or OK leaves. The
 -- changes are sent to the runtime when the page is left (UiSoundManager:play_se_label("recomp_set:...")), which
--- writes them into graphics.ini; they take effect at the next start.
+-- writes them into graphics.ini and applies them at once, except the resolution and vsync, which take effect at the
+-- next start (their rows say so once changed).
 
 local ui = UiScriptPlayer.require("common/ui_common")
 
@@ -14,10 +15,10 @@ local VALUES = "@@RECOMP_VALUES@@                                               
 local ROWS = {
     { key = "window", title = "Window", choices = { "windowed", "borderless", "fullscreen" },
       names = { "Windowed", "Borderless", "Fullscreen" } },
-    { key = "resolution_scale", title = "Resolution", choices = { "0.5", "0.75", "1.0" },
-      names = { "50%", "75%", "100%" } },
-    { key = "vsync", title = "VSync", choices = { "clock", "on", "off", "mailbox" },
-      names = { "Clock", "On", "Off", "Mailbox" } },
+    { key = "resolution_scale", title = "Resolution", choices = { "0.5", "0.75", "1.0", "1.5", "2.0" },
+      names = { "50%", "75%", "100%", "150%", "200%" }, restart = true },
+    { key = "vsync", title = "VSync", choices = { "auto", "display", "clock", "on", "off", "mailbox" },
+      names = { "Auto", "Display", "Clock", "On", "Off", "Mailbox" }, restart = true },
     { key = "anisotropic_filtering", title = "Texture filtering", choices = { "game", "2", "4", "8", "16" },
       names = { "Game", "2x", "4x", "8x", "16x" } },
     { key = "frame_time_overlay", title = "Frame time", choices = { "off", "on" }, names = { "Off", "On" } },
@@ -47,6 +48,7 @@ local function parse_values()
         for i, c in ipairs(row.choices) do
             if c == v or tonumber(c) ~= nil and tonumber(c) == tonumber(v) then row.index = i end
         end
+        row.start = row.index
     end
 end
 
@@ -65,6 +67,7 @@ end
 local function show_row(i)
     local row = ROWS[i]
     local text = string.format("%s:  < %s >", row.title, row.names[row.index])
+    if row.restart and row.index ~= row.start then text = text .. "  (after restart)" end
     row_parts(i):get_pane("set_txt_title"):set_text_string(text)
 end
 

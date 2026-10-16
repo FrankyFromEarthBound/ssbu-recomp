@@ -189,6 +189,10 @@ static int has_name(const VkExtensionProperties *e, uint32_t n, const char *name
 
 /* ---------------------------------------------------------------- swapchain */
 static void wait_last_submit(void);
+/* Asked from another thread (the window thread, after a window mode change or a size change): the present path
+ * (nvn_vk_draw.c) makes the swapchain again before its next present. */
+static volatile LONG g_vk_remake;
+void nvn_vk_remake_swapchain(void) { InterlockedExchange(&g_vk_remake, 1); }
 static void swapchain_destroy(void) {
     if (!V.swapchain) return;
     wait_last_submit();                                  /* also resets the fence for the next submit */
@@ -234,6 +238,7 @@ static int swapchain_create(void) {
     r = vkGetSwapchainImagesKHR(V.device, V.swapchain, &V.image_count, V.images);
     if (r != VK_SUCCESS && r != VK_INCOMPLETE) vk_fatal("vkGetSwapchainImagesKHR", r);
     V.extent = ext;
+    if (g_vk_recreated) { static const char *const k_mode[4] = {"immediate", "mailbox", "fifo", "fifo_relaxed"}; printf("nvn_vk: swapchain made again: %ux%u, %u images, present mode %s\n", ext.width, ext.height, V.image_count, V.mode < 4 ? k_mode[V.mode] : "?"); }
     return 1;
 }
 
