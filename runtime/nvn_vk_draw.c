@@ -3810,6 +3810,13 @@ swap: ;
     present_flush();
     tp[2] = tk();                               /* session 14: a present still kept for its tick goes out before the next one is made */
     if (g_pend.recreate) { g_pend.recreate = 0; cmd_wait_all(); swapchain_destroy(); InterlockedIncrement64(&g_vk_recreated); }
+#ifndef _WIN32
+    {   int display_take_resize(void);                          /* display.c: the window's pixel size changed (Wayland never says OUT_OF_DATE) */
+        if (display_take_resize() && V.swapchain) {
+            int w = 0, h = 0; SDL_GetWindowSizeInPixels((SDL_Window *)V.hwnd, &w, &h);
+            printf("nvn_vk: window %dx%d pixels: the swapchain (%ux%u) is made again\n", w, h, (unsigned)V.extent.width, (unsigned)V.extent.height); fflush(stdout);
+            cmd_wait_all(); swapchain_destroy(); InterlockedIncrement64(&g_vk_recreated); } }
+#endif
     /* an extra present of a held loading screen: everything submitted so far is waited for first, so that the semaphore pair
      * taken below has no pending operation (validation run s11v2: VUID-vkAcquireNextImageKHR-semaphore-01779, three times,
      * all at such presents: with one submission a present the pair came round before its command buffer had been waited for) */

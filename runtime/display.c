@@ -472,8 +472,13 @@ static void la_stop(void) {}
 static void la_note(const char *note) { (void)note; }
 int oe_exit_request(void);                            /* nnmisc.c */
 static char g_title[96];
+/* The window's pixel size changed (dragged, or the settings menu): Wayland does not report the swapchain out of date, so
+ * nvn_vk_draw.c asks this at each present and makes the swapchain again at the new size (as Windows' OUT_OF_DATE does) */
+static volatile LONG g_resized;
+int display_take_resize(void) { return InterlockedExchange(&g_resized, 0) != 0; }
 static bool SDLCALL close_watch(void *user, SDL_Event *e) {
     (void)user;
+    if (e->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) InterlockedExchange(&g_resized, 1);
     if (e->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED || e->type == SDL_EVENT_QUIT) {
         static volatile LONG once;
         if (InterlockedExchange(&once, 1)) return true;
