@@ -1018,7 +1018,8 @@ def main():
     # a finished build whose game files have gone since (an antivirus quarantines the 500 MB unsigned game DLL, or a
     # copy was interrupted): compile (the objects are kept, so only the DLL is linked again) and link run again
     if 'link' in done and not a.dry_run:
-        gone = [f for f in (EXE, 'ssbu_game_eh_o1.dll', 'SDL3.dll') if not os.path.exists(os.path.join(cx.work, f))]
+        files = (LINUX_EXE, game_lib(cx), 'ssbu_glslang.so') if cx.linux else (EXE, 'ssbu_game_eh_o1.dll', 'SDL3.dll')
+        gone = [f for f in files if not os.path.exists(os.path.join(cx.work, f))]
         if gone:
             say('%s missing from %s although the build was finished (an antivirus may have removed it: Windows Security > '
                 'Protection history): it is made again' % (', '.join(gone), cx.work))

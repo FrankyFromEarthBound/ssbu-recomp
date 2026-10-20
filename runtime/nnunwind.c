@@ -185,8 +185,13 @@ static SRWLOCK g_catch_lock = SRWLOCK_INIT;
  * reachable), and a throw must come back to the frame on the stack it runs on, never longjmp across stacks (that ended in
  * ntdll's unwinder with 0xC00000FF: tl4 / lh4 / li). Records of the same CFA on other stacks are left alone. */
 static int catch_here(const jmp_buf *jb) {            /* jb is on the stack this thread runs on now (TEB DeallocationStack .. StackBase) */
+#ifdef _WIN32
     NT_TIB *tib = (NT_TIB *)NtCurrentTeb();
     uint64_t a = (uint64_t)(uintptr_t)jb, lo = *(uint64_t *)((uint8_t *)tib + 0x1478), hi = (uint64_t)(uintptr_t)tib->StackBase;
+#else
+    uintptr_t lo, hi, a = (uintptr_t)jb;
+    if (!plat_current_stack(&lo, &hi)) return 1;
+#endif
     return a >= lo && a < hi;
 }
 static void catch_put(uint64_t cfa, jmp_buf *jb) {
@@ -327,7 +332,12 @@ static void eh_raise(Ctx *c, int reason) {
         }
         {   /* (R3 hs13, diagnosis) the jmp_buf must be on the stack this thread runs on now (its TEB limits): a longjmp across
              * stacks ends in ntdll's unwinder with 0xC00000FF (tl4 / nmr / le3a / lg2a after a rollback) */
+#ifdef _WIN32
             NT_TIB *tib = (NT_TIB *)NtCurrentTeb(); uint64_t a = (uint64_t)(uintptr_t)jb, lo = *(uint64_t *)((uint8_t *)tib + 0x1478), hi = (uint64_t)(uintptr_t)tib->StackBase;
+#else
+            uintptr_t lo = 0, hi = UINTPTR_MAX, a = (uintptr_t)jb;
+            plat_current_stack(&lo, &hi);
+#endif
             if (a < lo || a >= hi) {
                 volatile uint64_t here = 0;
                 printf("\nunwind: CROSS-STACK longjmp: handler f_%llx frame cfa %llx, jmp_buf %p is NOT on this thread's stack %llx..%llx (rsp ~%p, fiber %p, thread %lu)\n",

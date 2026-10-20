@@ -432,12 +432,21 @@ BOOL FlsSetValue(DWORD i, PVOID v) { return pthread_setspecific((pthread_key_t)i
  * On ucontext. As on Windows a fiber can be resumed on another thread than the one it last ran on (the running fiber is
  * per thread: t_fiber); swapcontext also saves and restores the signal mask, one system call per switch. The stack is
  * reserved whole at creation (MAP_NORESERVE: pages are used as touched), not grown from a commit size. */
-typedef struct { ucontext_t uc; LPFIBER_START_ROUTINE fn; LPVOID param; void *stack; size_t stack_size; int is_thread; } Fiber;
+typedef struct { ucontext_t uc; LPFIBER_START_ROUTINE fn; LPVOID param; void *stack; size_t stack_size; int is_thread; uintptr_t lo, hi; } Fiber;
 static __thread Fiber *t_fiber;
+static int thread_stack(uintptr_t *lo, uintptr_t *hi) {          /* the calling thread's own stack */
+    pthread_attr_t a; void *p; size_t n;
+    if (pthread_getattr_np(pthread_self(), &a)) return 0;
+    int ok = !pthread_attr_getstack(&a, &p, &n);
+    pthread_attr_destroy(&a);
+    if (ok) { *lo = (uintptr_t)p; *hi = (uintptr_t)p + n; }
+    return ok;
+}
 LPVOID ConvertThreadToFiber(LPVOID param) {
     if (t_fiber) return t_fiber;
     Fiber *f = calloc(1, sizeof *f);
     f->param = param; f->is_thread = 1;
+    thread_stack(&f->lo, &f->hi);        /* the fiber keeps this stack when another thread resumes it */
     t_fiber = f;
     return f;
 }
@@ -479,6 +488,18 @@ int plat_current_fiber_stack(uintptr_t *lo, uintptr_t *hi) {      /* crash repor
     Fiber *f = t_fiber;
     if (!f || f->is_thread || !f->stack) return 0;
     *lo = (uintptr_t)f->stack; *hi = (uintptr_t)f->stack + f->stack_size;
+    return 1;
+}
+/* the stack the caller runs on now (nnunwind.c: Windows reads the TEB's DeallocationStack .. StackBase): a fiber's own,
+ * the converting thread's for a fiber made with ConvertThreadToFiber, else this thread's (read once per thread: for
+ * the main thread glibc reads /proc/self/maps) */
+int plat_current_stack(uintptr_t *lo, uintptr_t *hi) {
+    static __thread uintptr_t t_lo, t_hi;
+    Fiber *f = t_fiber;
+    if (f && !f->is_thread && f->stack) { *lo = (uintptr_t)f->stack; *hi = (uintptr_t)f->stack + f->stack_size; return 1; }
+    if (f && f->hi) { *lo = f->lo; *hi = f->hi; return 1; }
+    if (!t_hi && !thread_stack(&t_lo, &t_hi)) return 0;
+    *lo = t_lo; *hi = t_hi;
     return 1;
 }
 LPVOID GetFiberData(void) { return t_fiber ? t_fiber->param : NULL; }

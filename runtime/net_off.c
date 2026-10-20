@@ -14,3 +14,6 @@ void net_list_rooms(uint32_t seq) { (void)seq; }
 void net_send(uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport, const void *data, uint32_t len) {
     (void)src; (void)sport; (void)dst; (void)dport; (void)data; (void)len;
 }
+/* rb_net.c (online rollback, off unless SSBU_RB_NET): never joined, nothing sent */
+int net_rb_ready(void) { return 0; }
+int net_rb_send(const void *p, int n) { (void)p; (void)n; return 0; }

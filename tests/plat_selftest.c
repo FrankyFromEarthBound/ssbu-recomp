@@ -22,7 +22,9 @@ static HANDLE ev;
 static DWORD WINAPI setter(LPVOID arg) { (void)arg; Sleep(50); SetEvent(ev); return 0; }
 static void *main_fiber, *fib;
 static int fiber_steps;
-static void fiber_fn(LPVOID p) { for (;;) { fiber_steps += (int)(uintptr_t)p; SwitchToFiber(main_fiber); } }
+static int on_stack(void) { volatile int here = 0; uintptr_t lo, hi; return plat_current_stack(&lo, &hi) && (uintptr_t)&here >= lo && (uintptr_t)&here < hi && hi - lo <= ((uintptr_t)64 << 20); }
+static int fiber_on_stack;
+static void fiber_fn(LPVOID p) { fiber_on_stack = on_stack(); for (;;) { fiber_steps += (int)(uintptr_t)p; SwitchToFiber(main_fiber); } }
 static BOOL CALLBACK once_fn(PINIT_ONCE o, PVOID p, PVOID *c) { (void)o; (void)c; (*(int *)p)++; return TRUE; }
 
 int main(void) {
@@ -167,10 +169,12 @@ int main(void) {
     cnt = 64;
     CHECK(GetWriteWatch(0, any, 4096, pages, &cnt, &gr) != 0, "write watch: unwatched memory refused");
     /* fibers */
+    int thread_on_stack = on_stack();
     main_fiber = ConvertThreadToFiber(NULL);
     fib = CreateFiberEx(0, 1 << 20, 0, fiber_fn, (LPVOID)5);
     SwitchToFiber(fib); SwitchToFiber(fib);
     CHECK(fiber_steps == 10 && GetCurrentFiber() == main_fiber, "fibers");
+    CHECK(thread_on_stack && fiber_on_stack && on_stack(), "plat_current_stack: thread, fiber, converted thread");
     /* files, with Windows separators */
     CreateDirectoryA("plat_test_dir", NULL);
     CHECK(!CreateDirectoryA("plat_test_dir", NULL) && GetLastError() == ERROR_ALREADY_EXISTS, "CreateDirectory twice: ERROR_ALREADY_EXISTS");

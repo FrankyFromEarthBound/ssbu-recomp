@@ -273,6 +273,7 @@ void SwitchToFiber(LPVOID fiber);
 void DeleteFiber(LPVOID fiber);
 LPVOID GetCurrentFiber(void);
 LPVOID GetFiberData(void);
+int plat_current_stack(uintptr_t *lo, uintptr_t *hi);     /* the stack the caller runs on now (fiber or thread); 0 = unknown */
 
 /* ---- virtual memory (mmap, with a page-state map for VirtualQuery) ---- */
 #define MEM_COMMIT 0x1000
