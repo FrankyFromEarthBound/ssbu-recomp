@@ -123,6 +123,7 @@ static DWORD err_from_errno(int e) {
     case ENOTEMPTY: return ERROR_DIR_NOT_EMPTY;
     case ENOSPC: return ERROR_DISK_FULL;
     case EINVAL: return ERROR_INVALID_PARAMETER;
+    case EFAULT: return ERROR_NOACCESS;
     default: return 0x1F;    /* ERROR_GEN_FAILURE */
     }
 }
@@ -194,10 +195,21 @@ static long futex(volatile uint32_t *a, int op, uint32_t v, const struct timespe
 static BOOL cv_wait(CONDITION_VARIABLE *cv, DWORD ms, void (*unlock)(void *), void (*lock)(void *), void *l) {
     uint32_t seq = __atomic_load_n(&cv->seq, __ATOMIC_SEQ_CST);
     unlock(l);
-    long r;
-    if (ms == INFINITE) r = futex(&cv->seq, FUTEX_WAIT_PRIVATE, seq, NULL);
-    else { struct timespec ts = {ms / 1000, (long)(ms % 1000) * 1000000L}; r = futex(&cv->seq, FUTEX_WAIT_PRIVATE, seq, &ts); }
-    int e = errno;
+    long r; int e = 0;
+    int64_t end = ms == INFINITE ? 0 : mono_ns() + (int64_t)ms * 1000000LL;
+    for (;;) {
+        if (ms == INFINITE) r = futex(&cv->seq, FUTEX_WAIT_PRIVATE, seq, NULL);
+        else {
+            int64_t left = end - mono_ns();
+            if (left <= 0) { r = -1; e = ETIMEDOUT; break; }
+            struct timespec ts = {left / 1000000000LL, left % 1000000000LL}; r = futex(&cv->seq, FUTEX_WAIT_PRIVATE, seq, &ts);
+        }
+        e = r == -1 ? errno : 0;
+        /* a signal is not a wake-up (SuspendThread holds a thread with one; on Windows a suspended thread's wait goes on):
+         * the wait goes on for the time left. A timed futex wait comes back with EINTR, an untimed one is made again. */
+        if (r == -1 && e == EINTR && __atomic_load_n(&cv->seq, __ATOMIC_SEQ_CST) == seq) continue;
+        break;
+    }
     lock(l);
     if (r == -1 && e == ETIMEDOUT) { t_lasterr = 1460; return FALSE; }      /* ERROR_TIMEOUT */
     return TRUE;
@@ -264,6 +276,11 @@ typedef struct PlatObj {
     /* threads */
     pthread_t th; pid_t tid; DWORD exit_code; int started;
     LPTHREAD_START_ROUTINE fn; LPVOID arg;
+    uintptr_t stk_lo, stk_hi;        /* its host stack (plat_thread_stacks) */
+    void *volatile fiber;            /* the fiber it runs now (SwitchToFiber; plat_thread_fiber) */
+#if defined(__linux__) && defined(__x86_64__)
+    volatile uint32_t sus_ack, sus_gen; LONG sus_count; CONTEXT sus_ctx;    /* SuspendThread */
+#endif
     /* files, finds, mappings */
     int fd;
     DIR *dir; char dir_path[MAX_PATH]; char pattern[MAX_PATH];
@@ -302,14 +319,18 @@ static int is_obj(HANDLE h) { return h && h != INVALID_HANDLE_VALUE && h != PSEU
 
 /* threads */
 static __thread PlatObj *t_self;
+static PlatObj *g_thr[1024]; static int g_nthr; static pthread_mutex_t g_thr_lock = PTHREAD_MUTEX_INITIALIZER;   /* live threads of CreateThread */
 static void *thread_tramp(void *p) {
     PlatObj *o = p;
     t_self = o;
+    plat_current_stack(&o->stk_lo, &o->stk_hi);
+    pthread_mutex_lock(&g_thr_lock); if (g_nthr < 1024) g_thr[g_nthr++] = o; pthread_mutex_unlock(&g_thr_lock);
     o->tid = os_tid();
     pthread_mutex_lock(&o->m);
     while (!o->started) pthread_cond_wait(&o->cv, &o->m);     /* CREATE_SUSPENDED: held until ResumeThread */
     pthread_mutex_unlock(&o->m);
     DWORD r = o->fn(o->arg);
+    pthread_mutex_lock(&g_thr_lock); for (int i = 0; i < g_nthr; i++) if (g_thr[i] == o) { g_thr[i] = g_thr[--g_nthr]; break; } pthread_mutex_unlock(&g_thr_lock);
     pthread_mutex_lock(&o->m);
     o->exit_code = r; o->signaled = 1;
     pthread_cond_broadcast(&o->cv);
@@ -331,17 +352,144 @@ HANDLE CreateThread(SECURITY_ATTRIBUTES *sa, SIZE_T stack, LPTHREAD_START_ROUTIN
     if (tid) { while (!__atomic_load_n(&o->tid, __ATOMIC_ACQUIRE)) sched_yield(); *tid = (DWORD)o->tid; }
     return o;
 }
+#if defined(__linux__) && defined(__x86_64__)
+/* SuspendThread (r1_state.c rollback: the guest threads are held while the game's memory is saved or loaded). pthreads cannot
+ * stop another thread: SIG_SUSPEND is sent, and the thread's handler stores the registers it was stopped with (GetThreadContext),
+ * says so and waits (futex) until ResumeThread brings the count back to 0. A thread blocked in a system call is stopped there
+ * (SA_RESTART: the call is made again after the handler; the kernel then reports RIP at the `syscall` instruction, not after it).
+ * Only threads made by CreateThread (their PlatObj) can be held. */
+#define SIG_SUSPEND (SIGRTMIN + 6)
+static void ctx_from_uc(CONTEXT *c, const ucontext_t *u) {
+    const greg_t *g = u->uc_mcontext.gregs;
+    c->Rax = g[REG_RAX]; c->Rcx = g[REG_RCX]; c->Rdx = g[REG_RDX]; c->Rbx = g[REG_RBX]; c->Rsp = g[REG_RSP]; c->Rbp = g[REG_RBP];
+    c->Rsi = g[REG_RSI]; c->Rdi = g[REG_RDI]; c->R8 = g[REG_R8]; c->R9 = g[REG_R9]; c->R10 = g[REG_R10]; c->R11 = g[REG_R11];
+    c->R12 = g[REG_R12]; c->R13 = g[REG_R13]; c->R14 = g[REG_R14]; c->R15 = g[REG_R15]; c->Rip = g[REG_RIP]; c->EFlags = (DWORD)g[REG_EFL];
+}
+static void ctx_to_uc(ucontext_t *u, const CONTEXT *c) {
+    greg_t *g = u->uc_mcontext.gregs;
+    g[REG_RAX] = c->Rax; g[REG_RCX] = c->Rcx; g[REG_RDX] = c->Rdx; g[REG_RBX] = c->Rbx; g[REG_RSP] = c->Rsp; g[REG_RBP] = c->Rbp;
+    g[REG_RSI] = c->Rsi; g[REG_RDI] = c->Rdi; g[REG_R8] = c->R8; g[REG_R9] = c->R9; g[REG_R10] = c->R10; g[REG_R11] = c->R11;
+    g[REG_R12] = c->R12; g[REG_R13] = c->R13; g[REG_R14] = c->R14; g[REG_R15] = c->R15; g[REG_RIP] = c->Rip; g[REG_EFL] = c->EFlags;
+}
+static void sus_signal(int sig, siginfo_t *si, void *uc) {
+    (void)sig; (void)si;
+    PlatObj *o = t_self;
+    if (!o) return;
+    int e = errno;
+    uint32_t g = __atomic_load_n(&o->sus_gen, __ATOMIC_ACQUIRE);
+    ctx_from_uc(&o->sus_ctx, uc);
+    __atomic_store_n(&o->sus_ack, 1, __ATOMIC_RELEASE);
+    futex(&o->sus_ack, FUTEX_WAKE_PRIVATE, INT_MAX, NULL);
+    while (__atomic_load_n(&o->sus_gen, __ATOMIC_ACQUIRE) == g) futex(&o->sus_gen, FUTEX_WAIT_PRIVATE, g, NULL);
+    errno = e;
+}
+static pthread_once_t g_sus_once = PTHREAD_ONCE_INIT;
+static void sus_init(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = sus_signal;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIG_SUSPEND, &sa, NULL);
+}
+DWORD SuspendThread(HANDLE h) {
+    if (!is_obj(h) || ((PlatObj *)h)->kind != PO_THREAD || h == t_self) return (DWORD)-1;
+    PlatObj *o = h;
+    pthread_once(&g_sus_once, sus_init);
+    pthread_mutex_lock(&o->m);
+    LONG was = o->sus_count;
+    if (o->signaled) { pthread_mutex_unlock(&o->m); return (DWORD)-1; }                  /* finished */
+    if (was == 0 && o->started) {
+        __atomic_store_n(&o->sus_ack, 0, __ATOMIC_RELEASE);
+        if (pthread_kill(o->th, SIG_SUSPEND)) { pthread_mutex_unlock(&o->m); return (DWORD)-1; }
+        struct timespec ts = {0, 2000000};
+        for (int i = 0; !__atomic_load_n(&o->sus_ack, __ATOMIC_ACQUIRE); i++) {
+            if (i == 500) { pthread_mutex_unlock(&o->m); fprintf(stderr, "plat: SuspendThread: thread %d did not stop within 1 s\n", (int)o->tid); return (DWORD)-1; }
+            futex(&o->sus_ack, FUTEX_WAIT_PRIVATE, 0, &ts);
+        }
+    }
+    o->sus_count = was + 1;
+    pthread_mutex_unlock(&o->m);
+    return (DWORD)was;
+}
+/* AddVectoredExceptionHandler (r1_state.c rollback: the first write of a page it made read-only). A persistent SIGSEGV / SIGBUS
+ * handler gives each access violation to the handlers in order, as Windows does; one that answers EXCEPTION_CONTINUE_EXECUTION
+ * resumes the thread (with the registers it may have changed); otherwise the handler that was there before (hostrt.c's crash
+ * report) gets the signal. SIG_SUSPEND is blocked while a handler runs: a thread is never held inside one. */
+static PVECTORED_EXCEPTION_HANDLER g_veh[16]; static volatile int g_nveh; static struct sigaction g_veh_old_segv, g_veh_old_bus;
+static pthread_mutex_t g_veh_lock = PTHREAD_MUTEX_INITIALIZER;
+static __thread int t_veh_passed;                                /* this fault went through the handlers already (hostrt.c asks again) */
+int plat_veh_fault(int sig, siginfo_t *si, void *ucv) {
+    int n = __atomic_load_n(&g_nveh, __ATOMIC_ACQUIRE);
+    if ((sig != SIGSEGV && sig != SIGBUS) || !n || t_veh_passed) { t_veh_passed = 0; return 0; }
+    ucontext_t *u = ucv;
+    CONTEXT cx; memset(&cx, 0, sizeof cx); cx.ContextFlags = CONTEXT_FULL; ctx_from_uc(&cx, u);
+    EXCEPTION_RECORD er; memset(&er, 0, sizeof er);
+    greg_t err = u->uc_mcontext.gregs[REG_ERR];
+    er.ExceptionCode = EXCEPTION_ACCESS_VIOLATION; er.ExceptionAddress = (PVOID)(uintptr_t)cx.Rip; er.NumberParameters = 2;
+    er.ExceptionInformation[0] = (err & 0x10) ? 8 : (err & 2) ? 1 : 0;          /* execute / write / read, as Windows */
+    er.ExceptionInformation[1] = (ULONG_PTR)si->si_addr;
+    EXCEPTION_POINTERS ep = {&er, &cx};
+    for (int i = 0; i < n; i++) if (g_veh[i](&ep) == EXCEPTION_CONTINUE_EXECUTION) { ctx_to_uc(u, &cx); return 1; }
+    return 0;
+}
+static void veh_signal(int sig, siginfo_t *si, void *uc) {
+    if (plat_veh_fault(sig, si, uc)) return;
+    struct sigaction *o = sig == SIGBUS ? &g_veh_old_bus : &g_veh_old_segv;
+    t_veh_passed = 1;
+    if ((o->sa_flags & SA_SIGINFO) && o->sa_sigaction) { o->sa_sigaction(sig, si, uc); t_veh_passed = 0; return; }
+    t_veh_passed = 0;
+    if (o->sa_handler != SIG_DFL && o->sa_handler != SIG_IGN) { o->sa_handler(sig); return; }
+    signal(sig, SIG_DFL);                                         /* the default action: the fault happens again and ends the process */
+}
+void plat_veh_install(void) {                                     /* (hostrt.c) after its crash handler was set again */
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = veh_signal;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask); sigaddset(&sa.sa_mask, SIG_SUSPEND);
+    sigaction(SIGSEGV, &sa, &g_veh_old_segv); sigaction(SIGBUS, &sa, &g_veh_old_bus);
+}
+PVOID AddVectoredExceptionHandler(ULONG first, PVECTORED_EXCEPTION_HANDLER fn) {
+    pthread_once(&g_sus_once, sus_init);
+    pthread_mutex_lock(&g_veh_lock);
+    int n = g_nveh;
+    if (n == 16) { pthread_mutex_unlock(&g_veh_lock); return NULL; }
+    if (first) { memmove(g_veh + 1, g_veh, (size_t)n * sizeof *g_veh); g_veh[0] = fn; } else g_veh[n] = fn;
+    __atomic_store_n(&g_nveh, n + 1, __ATOMIC_RELEASE);
+    if (!n) plat_veh_install();
+    pthread_mutex_unlock(&g_veh_lock);
+    return (PVOID)fn;
+}
+BOOL GetThreadContext(HANDLE h, CONTEXT *c) {
+    if (!is_obj(h) || ((PlatObj *)h)->kind != PO_THREAD) return FALSE;
+    PlatObj *o = h;
+    if (!o->sus_count || !__atomic_load_n(&o->sus_ack, __ATOMIC_ACQUIRE)) return FALSE;
+    DWORD f = c->ContextFlags; *c = o->sus_ctx; c->ContextFlags = f;
+    return TRUE;
+}
+#endif
 DWORD ResumeThread(HANDLE h) {
     if (!is_obj(h)) return (DWORD)-1;
     PlatObj *o = h;
     pthread_mutex_lock(&o->m);
+#if defined(__linux__) && defined(__x86_64__)
+    if (o->sus_count > 0) {                                  /* held by SuspendThread */
+        LONG was = o->sus_count--;
+        if (!o->sus_count) { __atomic_add_fetch(&o->sus_gen, 1, __ATOMIC_ACQ_REL); futex(&o->sus_gen, FUTEX_WAKE_PRIVATE, INT_MAX, NULL); }
+        pthread_mutex_unlock(&o->m);
+        return (DWORD)was;
+    }
+#endif
     DWORD was = o->started ? 0 : 1;
     o->started = 1;
     pthread_cond_broadcast(&o->cv);
     pthread_mutex_unlock(&o->m);
     return was;
 }
+#if !(defined(__linux__) && defined(__x86_64__))
 DWORD SuspendThread(HANDLE h) { (void)h; return (DWORD)-1; }      /* pthreads cannot stop another thread: failure, which every caller (diagnostics) handles */
+#endif
 HANDLE GetCurrentThread(void) { return PSEUDO_THREAD; }
 HANDLE GetCurrentProcess(void) { return PSEUDO_PROCESS; }
 DWORD GetCurrentThreadId(void) { static __thread DWORD id; if (!id) id = (DWORD)os_tid(); return id; }
@@ -574,6 +722,7 @@ LPVOID ConvertThreadToFiber(LPVOID param) {
     Fiber *f = calloc(1, sizeof *f);
     f->param = param; f->is_thread = 1;
     t_fiber = f;
+    if (t_self) t_self->fiber = f;
     return f;
 }
 BOOL ConvertFiberToThread(void) { if (t_fiber && t_fiber->is_thread) free(t_fiber); t_fiber = NULL; return TRUE; }
@@ -600,6 +749,7 @@ void SwitchToFiber(LPVOID fiber) {
     Fiber *from = t_fiber, *to = fiber;
     if (from == to) return;
     t_fiber = to;
+    if (t_self) t_self->fiber = to;
 #if defined(__APPLE__) && defined(__aarch64__)
     plat_fiber_switch(&from->uc, &to->uc);
 #else
@@ -627,6 +777,31 @@ int plat_current_fiber_stack(uintptr_t *lo, uintptr_t *hi) {      /* crash repor
     return 1;
 }
 LPVOID GetFiberData(void) { return t_fiber ? t_fiber->param : NULL; }
+/* (r1_state.c) Windows' fiber block: StackBase +0x10, DeallocationStack +0x20, the saved Rsp in its CONTEXT; here the Fiber */
+size_t plat_fiber_block_size(void) { return sizeof(Fiber); }
+int plat_fiber_stack_of(const void *fiber, uint64_t *lo, uint64_t *hi, uint64_t *sp) {
+    const Fiber *f = fiber;
+    if (!f || f->is_thread || !f->stack) return 0;
+    *lo = (uint64_t)(uintptr_t)f->stack; *hi = *lo + f->stack_size;
+#if defined(__APPLE__) && defined(__aarch64__)
+    *sp = f->uc.r[12];
+#else
+    *sp = (uint64_t)f->uc.uc_mcontext.gregs[REG_RSP];
+#endif
+    return 1;
+}
+void *plat_thread_fiber(HANDLE h) { return is_obj(h) && ((PlatObj *)h)->kind == PO_THREAD ? ((PlatObj *)h)->fiber : h == PSEUDO_THREAD ? t_fiber : NULL; }
+int plat_thread_stacks(uint64_t (*out)[2], int max) {
+    int n = 0;
+    pthread_mutex_lock(&g_thr_lock);
+    for (int i = 0; i < g_nthr && n < max; i++) if (g_thr[i]->stk_hi) { out[n][0] = g_thr[i]->stk_lo; out[n][1] = g_thr[i]->stk_hi; n++; }
+    pthread_mutex_unlock(&g_thr_lock);
+    FILE *m = fopen("/proc/self/maps", "r");                /* the main thread's */
+    char line[512];
+    while (m && n < max && fgets(line, sizeof line, m)) { unsigned long a, b; if (strstr(line, "[stack]") && sscanf(line, "%lx-%lx", &a, &b) == 2) { out[n][0] = a; out[n][1] = b; n++; } }
+    if (m) fclose(m);
+    return n;
+}
 /* nnunwind.c: the bounds of the stack this thread runs on now: the running fiber's, else the thread's own */
 int plat_current_stack(uintptr_t *lo, uintptr_t *hi) {
     if (plat_current_fiber_stack(lo, hi)) return 1;
@@ -1757,8 +1932,15 @@ int MessageBoxW(HWND w, LPCWSTR text, LPCWSTR title, UINT type) {
 
 /* ================================================================ odds and ends */
 DWORD GetCurrentProcessorNumber(void) { int c = sched_getcpu(); return c < 0 ? 0 : (DWORD)c; }
+/* through a buffer of its own: the kernel does not fault for its writes, it fails (EFAULT) on a page the rollback made
+ * read-only (r1_state.c), where Windows' RtlGenRandom (user mode) faults and is let through */
 BOOLEAN SystemFunction036(PVOID buf, ULONG n) {
-    for (ULONG done = 0; done < n;) { ssize_t k = getrandom((char *)buf + done, n - done, 0); if (k < 0) { if (errno == EINTR) continue; return FALSE; } done += (ULONG)k; }
+    for (ULONG done = 0; done < n;) {
+        uint8_t b[256]; size_t want = n - done < sizeof b ? n - done : sizeof b;
+        ssize_t k = getrandom(b, want, 0);
+        if (k < 0) { if (errno == EINTR) continue; return FALSE; }
+        memcpy((char *)buf + done, b, (size_t)k); done += (ULONG)k;
+    }
     return TRUE;
 }
 BOOL QueryThreadCycleTime(HANDLE h, ULONG64 *cycles) {

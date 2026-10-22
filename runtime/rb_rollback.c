@@ -306,6 +306,9 @@ static void rbt_body(void) {
     rbg_step_body(g_rbt_c);
 }
 static void rbg_step(Ctx *c) {
+#ifndef _WIN32
+    rbg_step_body(c); return;                            /* (SSBU_RB_NET_TEST_STK: Windows only) */
+#endif
     if (g_rbt < 0) {
         const char *e = getenv("SSBU_RB_NET_TEST_STK"); g_rbt = e && atoi(e) > 0;
         for (uint64_t a = 0x7180000000ull; g_rbt && !g_rbt_stk && a < 0x7300000000ull; a += 0x10000000ull)
@@ -316,6 +319,7 @@ static void rbg_step(Ctx *c) {
     }
     if (!g_rbt) { rbg_step_body(c); return; }
     g_rbt_c = c;
+#ifdef _WIN32
     NT_TIB *tib = (NT_TIB *)NtCurrentTeb(); void *ob = tib->StackBase, *ol = tib->StackLimit;
     uint8_t *top = g_rbt_stk + (1u << 20) - 256;
     tib->StackBase = g_rbt_stk + (1u << 20); tib->StackLimit = g_rbt_stk;
@@ -327,6 +331,7 @@ static void rbg_step(Ctx *c) {
                      : : "r"(top), "r"(rbt_body)
                      : "rbx", "rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "cc", "memory");
     tib->StackBase = ob; tib->StackLimit = ol;
+#endif
 }
 /* nnhid.c (through r1_pad / r1_pad_id): the pad of port id (0 / 1) in the pass now running */
 static void rbg_pad(int id, uint64_t *b, int *lx, int *ly, int *rx, int *ry) {

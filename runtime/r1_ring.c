@@ -431,6 +431,7 @@ int r1_ring_rebase(long long frame, Ctx *c) {
     double t1 = now_ms();
     hs_exclude_all();
     int nmod = 0;
+#ifdef _WIN32                                             /* (Linux: no game build with marks) */
     {   HANDLE sn = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
         MODULEENTRY32 me; me.dwSize = sizeof me;
         for (BOOL ok = sn != INVALID_HANDLE_VALUE && Module32First(sn, &me); ok; ok = Module32Next(sn, &me)) {
@@ -440,6 +441,7 @@ int r1_ring_rebase(long long frame, Ctx *c) {
             if (*a1 != *pm1) { *a1 = *pm1; *a2 = *pm2; *l1 = (uint64_t)(uintptr_t)g_win1; MemoryBarrier(); *n2 = WN2; *n1 = g_wn1; nmod++; LOG("r1: RING rebase: mark maps set in %s (loaded after the first save)\n", me.szModule); }
         }
         if (sn != INVALID_HANDLE_VALUE) CloseHandle(sn); }
+#endif
     rg_sweep(rg_noop);                                    /* marks since the last capture: the copy below takes everything */
     g_rg_ntl = 0;
     collect(c);
@@ -809,6 +811,9 @@ static RgsS *rgss_slot(uint64_t fn) {
     return NULL;
 }
 static DWORD WINAPI rgss_thread(void *p) {
+#ifndef _WIN32
+    (void)p; return 0;                                   /* (Windows only: RtlVirtualUnwind) */
+#else
     (void)p; uint64_t fr[64]; int nf;
     double next = now_ms();
     for (;;) {
@@ -837,8 +842,13 @@ static DWORD WINAPI rgss_thread(void *p) {
         for (int i = 0; i < nf; i++) { int dup = 0; for (int j = 0; j < i; j++) if (fr[j] == fr[i]) dup = 1; if (dup) continue; RgsS *q = rgss_slot(fr[i]); if (q) q->incl[kd][seg]++; }
     }
     return 0;
+#endif
 }
 static void rgs_samp_start(void) {
+#ifndef _WIN32
+    if (g_rgs_prof == 3 && !g_rgss_run) { g_rgss_run = 1; LOG("r1: RB PROF 3 (sampling the main thread) is Windows only\n"); }
+    return;
+#endif
     if (g_rgss_run || g_rgs_prof != 3) return;
     g_rgss_run = 1;
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &g_rgss_main, 0, FALSE, DUPLICATE_SAME_ACCESS);
