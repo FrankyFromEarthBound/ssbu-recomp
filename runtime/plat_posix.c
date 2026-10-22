@@ -694,9 +694,10 @@ PVOID FlsGetValue(DWORD i) { return pthread_getspecific((pthread_key_t)i); }
 BOOL FlsSetValue(DWORD i, PVOID v) { return pthread_setspecific((pthread_key_t)i, v) == 0; }
 
 /* ================================================================ fibers
- * On ucontext. As on Windows a fiber can be resumed on another thread than the one it last ran on (the running fiber is
- * per thread: t_fiber); swapcontext also saves and restores the signal mask, one system call per switch. The stack is
- * reserved whole at creation (MAP_NORESERVE: pages are used as touched), not grown from a commit size. */
+ * As on Windows a fiber can be resumed on another thread than the one it last ran on (the running fiber is per thread:
+ * t_fiber). A switch saves and loads the callee-saved registers by hand (Linux x86-64, macOS on Apple Silicon), elsewhere
+ * on ucontext (swapcontext also saves and restores the signal mask, one system call per switch). The stack is reserved
+ * whole at creation (MAP_NORESERVE: pages are used as touched), not grown from a commit size. */
 #if defined(__APPLE__) && defined(__aarch64__)
 /* macOS on Apple Silicon has no working ucontext: a switch of the callee-saved registers instead (x19-x28, fp, lr, sp,
  * d8-d15; everything else is the caller's to keep across a call). A new fiber's first switch "returns" into fiber_entry
@@ -712,6 +713,21 @@ __asm__(".text\n.globl _plat_fiber_switch\n.p2align 2\n_plat_fiber_switch:\n"
         "  ldp x27, x28, [x1, #64]\n  ldp x29, x30, [x1, #80]\n  ldr x9, [x1, #96]\n  mov sp, x9\n"
         "  ldp d8, d9, [x1, #104]\n  ldp d10, d11, [x1, #120]\n  ldp d12, d13, [x1, #136]\n  ldp d14, d15, [x1, #152]\n"
         "  ret\n");
+typedef struct { FiberRegs uc; LPFIBER_START_ROUTINE fn; LPVOID param; void *stack; size_t stack_size; int is_thread; } Fiber;
+#elif defined(__linux__) && defined(__x86_64__)
+/* Linux x86-64: rbx, rbp, r12-r15, rsp and the SSE / x87 control words (System V: everything else is the caller's to keep),
+ * not swapcontext: no system call in a switch, so it is user code only, as SwitchToFiber is on Windows. The rollback
+ * (r1_state.c) holds a thread only when it is blocked in a system call; swapcontext's signal-mask call made a thread
+ * half-way through a switch look like one. A new fiber's first switch "returns" into fiber_entry on its own stack. */
+typedef struct { uint64_t rsp, rbx, rbp, r12, r13, r14, r15; uint32_t mxcsr; uint16_t fpucw; } FiberRegs;
+void plat_fiber_switch(FiberRegs *from, FiberRegs *to);
+__asm__(".text\n.globl plat_fiber_switch\n.hidden plat_fiber_switch\n.type plat_fiber_switch, @function\n.p2align 4\nplat_fiber_switch:\n"
+        "  movq %rbx, 8(%rdi)\n  movq %rbp, 16(%rdi)\n  movq %r12, 24(%rdi)\n  movq %r13, 32(%rdi)\n  movq %r14, 40(%rdi)\n  movq %r15, 48(%rdi)\n"
+        "  stmxcsr 56(%rdi)\n  fnstcw 60(%rdi)\n  movq %rsp, 0(%rdi)\n"
+        "  movq 0(%rsi), %rsp\n"
+        "  movq 8(%rsi), %rbx\n  movq 16(%rsi), %rbp\n  movq 24(%rsi), %r12\n  movq 32(%rsi), %r13\n  movq 40(%rsi), %r14\n  movq 48(%rsi), %r15\n"
+        "  ldmxcsr 56(%rsi)\n  fldcw 60(%rsi)\n"
+        "  ret\n.size plat_fiber_switch, .-plat_fiber_switch\n");
 typedef struct { FiberRegs uc; LPFIBER_START_ROUTINE fn; LPVOID param; void *stack; size_t stack_size; int is_thread; } Fiber;
 #else
 typedef struct { ucontext_t uc; LPFIBER_START_ROUTINE fn; LPVOID param; void *stack; size_t stack_size; int is_thread; } Fiber;
@@ -738,6 +754,13 @@ LPVOID CreateFiberEx(SIZE_T commit, SIZE_T reserve, DWORD flags, LPFIBER_START_R
     memset(&f->uc, 0, sizeof f->uc);
     f->uc.r[11] = (uint64_t)(uintptr_t)fiber_entry;                                     /* lr */
     f->uc.r[12] = ((uint64_t)(uintptr_t)f->stack + f->stack_size) & ~(uint64_t)15;      /* sp */
+#elif defined(__linux__) && defined(__x86_64__)
+    uint64_t *top = (uint64_t *)(uintptr_t)(((uint64_t)(uintptr_t)f->stack + f->stack_size) & ~(uint64_t)15);
+    top[-1] = 0;                                         /* fiber_entry's return address: none (an unwinder stops there) */
+    top[-2] = (uint64_t)(uintptr_t)fiber_entry;          /* taken by the first switch's ret: rsp then = 8 mod 16, as after a call */
+    memset(&f->uc, 0, sizeof f->uc);
+    f->uc.rsp = (uint64_t)(uintptr_t)(top - 2);
+    __asm__ volatile("stmxcsr %0\n\tfnstcw %1" : "=m"(f->uc.mxcsr), "=m"(f->uc.fpucw));
 #else
     getcontext(&f->uc);
     f->uc.uc_stack.ss_sp = f->stack; f->uc.uc_stack.ss_size = f->stack_size; f->uc.uc_link = NULL;
@@ -750,7 +773,7 @@ void SwitchToFiber(LPVOID fiber) {
     if (from == to) return;
     t_fiber = to;
     if (t_self) t_self->fiber = to;
-#if defined(__APPLE__) && defined(__aarch64__)
+#if (defined(__APPLE__) && defined(__aarch64__)) || (defined(__linux__) && defined(__x86_64__))
     plat_fiber_switch(&from->uc, &to->uc);
 #else
     swapcontext(&from->uc, &to->uc);
@@ -785,6 +808,8 @@ int plat_fiber_stack_of(const void *fiber, uint64_t *lo, uint64_t *hi, uint64_t 
     *lo = (uint64_t)(uintptr_t)f->stack; *hi = *lo + f->stack_size;
 #if defined(__APPLE__) && defined(__aarch64__)
     *sp = f->uc.r[12];
+#elif defined(__linux__) && defined(__x86_64__)
+    *sp = f->uc.rsp;
 #else
     *sp = (uint64_t)f->uc.uc_mcontext.gregs[REG_RSP];
 #endif

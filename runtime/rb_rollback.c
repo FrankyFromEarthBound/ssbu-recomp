@@ -122,6 +122,15 @@ static int rbg_sched(long long i, int m) {
     return m;
 }
 /* at the safe point (H2) of every pass while the fight runs (r1_ring.c rgs_step) */
+/* The last re-run pass is the one whose picture is shown after a rollback. Windows: it skips the presentation work like the
+ * others (default on, proven exact for the fight's state: rl4L, rl4K). Linux: it runs fully. With the skips its picture
+ * kept the lighting and the camera of the state loaded: the fighters tinted (magenta on Final Destination, red on Small
+ * Battlefield) and the stage jumping back and forth (measured 2026-10-22: SSBU_RB_NET=loop,4, battle frame 600). */
+#ifdef _WIN32
+#define RBG_LASTLITE_DEFAULT 1
+#else
+#define RBG_LASTLITE_DEFAULT 0
+#endif
 static void rbg_step_body(Ctx *c) {
     long long i = g_rgs_next;
     g_rbg_refused_tick = 0;
@@ -165,7 +174,7 @@ static void rbg_step_body(Ctx *c) {
         g_rbg_wd_before = g_ra_wd_fired;                /* (releases before the match, e.g. at its slow first passes, are harmless: no state in the ring yet) */
         g_rgs_next = i + 1;
         if (g_rbg_pace < 0) { const char *e = getenv("SSBU_RB_NET_PACE"); g_rbg_pace = !e || atoi(e) != 0; }
-        { const char *e = getenv("SSBU_RB_NET_LASTLITE"); g_rgs_lastlite = !e || atoi(e) != 0; }      /* default on here: proven exact (rl4L, rl4K); =0 runs the last re-run pass fully */
+        { const char *e = getenv("SSBU_RB_NET_LASTLITE"); g_rgs_lastlite = e ? atoi(e) != 0 : RBG_LASTLITE_DEFAULT; }      /* =1 the last re-run pass skips too, =0 it runs fully */
         if (!g_rbg_timer) g_rbg_timer = CreateWaitableTimerExW(NULL, NULL, 0x2 /* CREATE_WAITABLE_TIMER_HIGH_RESOLUTION */, TIMER_ALL_ACCESS);
         if (!g_rbg_timer) g_rbg_timer = CreateWaitableTimerExW(NULL, NULL, 0, TIMER_ALL_ACCESS);
         if (!g_rbg_work) { g_rbg_work = calloc(RBG_NT, sizeof *g_rbg_work); g_rbg_gap = calloc(RBG_NT, sizeof *g_rbg_gap); g_rbg_wcyc = calloc(RBG_NT, sizeof *g_rbg_wcyc); g_rbg_wk = calloc(RBG_NT, 1); }
