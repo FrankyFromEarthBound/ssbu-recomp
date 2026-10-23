@@ -1613,6 +1613,14 @@ static void hold_yield(void) {
 #endif
 }
 static int ra_audio(const char *n) { return strstr(n, "nus3::audio") || strstr(n, "sindou") || strstr(n, "AudioDevice"); }
+/* (Linux pair run nf9) a ring capture with ResLoadingThread in the middle of a load (blocked in its SleepThread, not at the
+ * WaitEvent it idles at) can never be loaded: by then the load is over and the thread does not come back to that wait, so
+ * every load of it was refused (500 ms each, 2 frames a second for minutes). Such a capture is skipped (the thread counts as
+ * not at a wait): every state in the ring has the loader idle. SSBU_RB_LOADER_IDLE=0: the old way. */
+static int ra_loader_busy(const Th *t) {
+    static int on = -1; if (on < 0) { const char *e = getenv("SSBU_RB_LOADER_IDLE"); on = !(e && e[0] == '0'); }
+    return on && rgs_wanted() && strstr(t->name, "ResLoadingThread") && !(t->c->in_import && strstr(t->c->in_import, "WaitEvent"));
+}
 static int ra_free(const char *n) { return strstr(n, "nopus") != NULL; }      /* never in a waiting import; its pages (decoder state, output) are not simulation */
 /* save: every other guest thread held inside a waiting import (its place and registers noted); 0 = one was not there in time */
 /* (R3 hs16, TEST ONLY) SSBU_RB_HOLD_PROF=1: where a hold's time goes, per thread (suspend + context + retries), and the
@@ -1648,14 +1656,14 @@ static int ra_hold_save(void) {
         double t0 = now_ms();
         if (all_first && pre[i]) {
             pre[i] = 0;
-            if (waiting_import(t->c->in_import) && th_blocked(t->h)) { t->held = 1; t->parked = 1; t->rsp = g_tb_rsp; t->rip = g_tb_rip; t->cok = 1; t->from = t->c->import_from; t->imp = t->c->in_import; t->regs = *t->c; continue; }
+            if (waiting_import(t->c->in_import) && th_blocked(t->h) && !ra_loader_busy(t)) { t->held = 1; t->parked = 1; t->rsp = g_tb_rsp; t->rip = g_tb_rip; t->cok = 1; t->from = t->c->import_from; t->imp = t->c->in_import; t->regs = *t->c; continue; }
             ResumeThread(t->h);
             for (int j = i + 1; j < g_nth; j++) if (pre[j]) { ResumeThread(g_th[j].h); pre[j] = 0; }      /* a thread not at a wait: the others go too (it may wait for one of them) */
         }
         int spins = 0;
         for (;;) {
             if (SuspendThread(t->h) == (DWORD)-1) break;
-            if (waiting_import(t->c->in_import) && th_blocked(t->h)) { t->held = 1; t->parked = 1; t->rsp = g_tb_rsp; t->rip = g_tb_rip; t->cok = 1; break; }
+            if (waiting_import(t->c->in_import) && th_blocked(t->h) && !ra_loader_busy(t)) { t->held = 1; t->parked = 1; t->rsp = g_tb_rsp; t->rip = g_tb_rip; t->cok = 1; break; }
             ResumeThread(t->h); spins++;
             if (now_ms() - t0 > g_ra_park_ms) {
                 if (g_hp_on) hp_add(t->name, now_ms() - t0, spins);

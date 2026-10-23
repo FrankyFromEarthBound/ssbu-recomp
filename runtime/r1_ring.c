@@ -59,6 +59,7 @@ static uint8_t **g_rg_xa, **g_rg_xb;                   /* extras page e: its add
 static uint8_t *g_rg_pool; static uint32_t g_rg_bump, g_rg_pcom, *g_rg_free, g_rg_nfree;
 static uint8_t *g_rg_cbs; static int *g_rg_ncbs; static int g_rg_cb_ok = -1;
 static double g_rg_park_ms = 30;
+static int g_rg_refuse_run; static long long g_rg_refuse_gaveup;      /* (R3 pub1) refusals of the rollback now pending in a row; loads made anyway after 8 */
 static int g_rg_keep, g_rg_kept, g_rg_keep_on = -1; static long long g_rg_kept_n, g_rg_kept_same;   /* capture -> load at the same safe point: threads stay held */
 static long long g_rg_caps, g_rg_cap_fail, g_rg_loads, g_rg_overflow;
 static double g_rg_last[2];
@@ -595,22 +596,33 @@ int r1_ring_load(long long frame, Ctx *c) {
      * ... now guest code") a thread that is still RUNNING guest code (not blocked at a wait) after the hold's 500 ms was suspended in
      * the middle of its code, and the load then changed the memory under its registers. Now such a load is REFUSED: every thread
      * goes on, nothing was changed yet, the wrong guess stays pending (rb_rollback.c) and the next tick loads again (one frame
-     * further back). SSBU_R1_RUNFIX=0: the old way (loaded anyway). SSBU_RB_NET_TEST_REFUSE=<n> (TEST ONLY): every n-th load is
-     * refused as if a thread were running (the timeline must not change). */
+     * further back). (Linux pair run p2j: ResLoadingThread, held at its WaitEvent in the capture, was BLOCKED in SleepThread in the
+     * middle of a load after the 500 ms; the load went on and the loader then read its rewound lists: NULL node, crash.) A thread
+     * blocked at another wait is refused the same way: its stack and registers belong to a later state than the memory loaded.
+     * SSBU_R1_RUNFIX=1: only a running thread refuses (as before); 0: the old way (loaded anyway). SSBU_RB_NET_TEST_REFUSE=<n>
+     * (TEST ONLY): every n-th load is refused as if a thread were running (the timeline must not change). */
     {   static int runfix = -1, tn = -1; static long long tc;
-        if (runfix < 0) { const char *e = getenv("SSBU_R1_RUNFIX"); runfix = !(e && e[0] == '0'); e = getenv("SSBU_RB_NET_TEST_REFUSE"); tn = e ? atoi(e) : 0; }
+        if (runfix < 0) { const char *e = getenv("SSBU_R1_RUNFIX"); runfix = e && e[0] ? atoi(e) : 2; e = getenv("SSBU_RB_NET_TEST_REFUSE"); tn = e ? atoi(e) : 0; }
         int forced = tn > 0 && ++tc % tn == 0;
-        if ((runfix && g_th_running) || forced) {
+        int refuse = (runfix == 1 && g_th_running) || (runfix >= 2 && g_th_mismatch);
+        /* the same rollback refused 8 times in a row (4 s): loaded the old way rather than freezing the match (logged) */
+        if (refuse && !forced && g_rg_refuse_run >= 8) {
+            refuse = 0; g_rg_refuse_gaveup++;
+            LOG("r1: RING load of frame %lld (k %d): refused %d times in a row; loaded anyway (%lld such loads)\n", frame, k, g_rg_refuse_run, g_rg_refuse_gaveup);
+        }
+        if (refuse || forced) {
+            g_rg_refuse_run++;
             unpark();
             Ctx *tc2; const char *nm2; HANDLE h2;                  /* the threads made after that frame (stop_born_threads) go on too */
             for (int i = g_ninfo; guest_thread_info(i, &tc2, &nm2, &h2); i++) if (h2 && GetThreadId(h2) != GetCurrentThreadId()) ResumeThread(h2);
             g_rg_refused++;
             if (g_rg_refused <= 20 || g_rg_refused % 100 == 0) LOG("r1: RING load of frame %lld (k %d) REFUSED (%lld so far): %s; every thread goes on, the rollback is tried again next tick\n",
-                frame, k, g_rg_refused, forced ? "test switch SSBU_RB_NET_TEST_REFUSE" : "a thread still running guest code after 500 ms");
+                frame, k, g_rg_refused, forced ? "test switch SSBU_RB_NET_TEST_REFUSE" : g_th_running ? "a thread still running guest code after 500 ms" : "a thread blocked at another wait than in that state after 500 ms");
             g_rgp_seg = 1;
             return -1;
         }
     }
+    g_rg_refuse_run = 0;
     double t1 = now_ms();
     R1_CTR("load (state of frame)", frame, 0);
     rgc_before();
