@@ -146,17 +146,31 @@ static void add_alloc(void *inside) {
     while (VirtualQuery(p, &m, sizeof m) && m.AllocationBase == base) p = (uint8_t *)m.BaseAddress + m.RegionSize;
     add_span(base, p);
 }
-static void find_heaps(void) {             /* once: the reservations of >= 16 GB (the game's address region) */
+static uint8_t *g_ar;
+/* A reservation of the game's: one it asked for (nn::os::AllocateAddressRegion, nncxxrt.c keeps them) or the guest C heap.
+ * Any other mapping of >= 16 GB is not game state: a room maker on Linux had one of 33 GB (20 GB of it read-write) beside
+ * the game's window, and taking it made the first save need 22 GB of free commit: rollback off for that match. */
+static int game_reservation(uint8_t *b) {
+    if (b == g_ar) return 1;
+    uint64_t gb, gs;
+    for (int i = 0; cxxrt_guest_region_at(i, &gb, &gs); i++) if ((uint8_t *)(uintptr_t)gb == b) return 1;
+    return 0;
+}
+static void heap_found(uint8_t *b, size_t span) {
+    if (!game_reservation(b)) { LOG("r1: a reservation of %.1f GB at %p is not the game's: left out of the state\n", span / 1073741824.0, (void *)b); return; }
+    if (g_nheap < 8) g_heap_base[g_nheap++] = b;
+}
+static void find_heaps(void) {             /* once: the game's reservations of >= 16 GB (its address region, the guest C heap) */
     MEMORY_BASIC_INFORMATION m;
     uint8_t *cur = NULL; size_t span = 0;
     for (uint8_t *p = (uint8_t *)0x10000; (uintptr_t)p < 0x7FFFFFFF0000ull && VirtualQuery(p, &m, sizeof m); p = (uint8_t *)m.BaseAddress + m.RegionSize) {
         if (m.AllocationBase != cur) {
-            if (cur && span >= (16ull << 30) && g_nheap < 8) g_heap_base[g_nheap++] = cur;
+            if (cur && span >= (16ull << 30)) heap_found(cur, span);
             cur = (uint8_t *)m.AllocationBase; span = 0;
         }
         if (cur) span += m.RegionSize;
     }
-    if (cur && span >= (16ull << 30) && g_nheap < 8) g_heap_base[g_nheap++] = cur;
+    if (cur && span >= (16ull << 30)) heap_found(cur, span);
     for (int i = 0; i < g_nheap; i++) LOG("r1: game address region %d at %p\n", i, (void *)g_heap_base[i]);
 }
 static uint64_t g_ex[512][2]; static int g_nex;                       /* other guest threads' stacks: never saved / restored */
@@ -164,7 +178,6 @@ static void ex_cb(uint64_t key, int sig, int cnt, uint64_t len, uint64_t thread,
     (void)key; (void)sig; (void)cnt; (void)len; (void)thread;
     if (stack && size && g_nex < 512) { g_ex[g_nex][0] = stack & ~(uint64_t)(PG - 1); g_ex[g_nex][1] = (stack + size + PG - 1) & ~(uint64_t)(PG - 1); g_nex++; }
 }
-static uint8_t *g_ar;
 static int cmp_rng(const void *x, const void *y) { const Rng *a = x, *b = y; return a->a < b->a ? -1 : a->a > b->a; }
 /* host DLLs that run fighter code (fighters_bin\*.dll, track S): their writable sections are simulation state too */
 #include <tlhelp32.h>
