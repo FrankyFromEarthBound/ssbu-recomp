@@ -1599,6 +1599,19 @@ static int th_blocked(HANDLE h) {
 #endif
     return r[-2] == 0x0f && r[-1] == 0x05;
 }
+/* between two tries of a hold (save and load), a thread not at its wait runs on. Windows: SwitchToThread. Linux: a sleep of
+ * SSBU_RB_HOLD_YIELD_US (default 200 us; 0 = SwitchToThread): plat_posix.c's SuspendThread is a signal round trip, and tried
+ * again at once the thread barely ran between two suspends. Pair runs b0n* / b2n* (3 + 3, 75 ms one way): the sound thread then
+ * missed its wait for 500 ms at a load (13 to 32 loads refused per game, 3.7 to 8.7 s of stalls); with 200 us 0 refused, 0 to
+ * 79 ms of stalls, timelines identical. */
+static void hold_yield(void) {
+#ifdef _WIN32
+    SwitchToThread();
+#else
+    static int us = -1; if (us < 0) { const char *e = getenv("SSBU_RB_HOLD_YIELD_US"); us = e && e[0] ? atoi(e) : 200; }
+    if (us > 0) { struct timespec ts = {0, us * 1000L}; nanosleep(&ts, NULL); } else SwitchToThread();
+#endif
+}
 static int ra_audio(const char *n) { return strstr(n, "nus3::audio") || strstr(n, "sindou") || strstr(n, "AudioDevice"); }
 static int ra_free(const char *n) { return strstr(n, "nopus") != NULL; }      /* never in a waiting import; its pages (decoder state, output) are not simulation */
 /* save: every other guest thread held inside a waiting import (its place and registers noted); 0 = one was not there in time */
@@ -1652,7 +1665,7 @@ static int ra_hold_save(void) {
                 if (strstr(t->name, "TaskWorker")) g_ra_skip_why[0]++; else if (ra_audio(t->name)) g_ra_skip_why[1]++; else g_ra_skip_why[2]++;
                 return 0;
             }
-            SwitchToThread();
+            hold_yield();
         }
         if (g_hp_on) hp_add(t->name, now_ms() - t0, spins);
         t->from = t->c->import_from; t->imp = t->c->in_import; t->regs = *t->c;
@@ -1684,7 +1697,7 @@ static void ra_hold_restore(void) {
                     t->imp ? t->imp : "guest code", (unsigned long long)t->from, t->c->in_import ? t->c->in_import : "guest code", (unsigned long long)t->c->import_from, th_blocked(t->h));
                 break; }
             ResumeThread(t->h);
-            SwitchToThread();
+            hold_yield();
         }
     }
 }
