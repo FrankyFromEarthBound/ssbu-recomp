@@ -9,7 +9,7 @@
  *  - the safe point after each pass (the kick after the submission 0x7103749b24, the same as run-ahead / SSBU_RB_SIM):
  *    received messages are applied; a wrong guess at frame m -> the ring state of frame m - 1 is loaded and the passes
  *    m .. now are run again with the corrected pads (re-run passes but the last skip presentation work: SSBU_RB_SIM_SKIP /
- *    SSBU_RB_SIM_LITE, default 49 / 127 here); then the next real pass waits for its 60 Hz tick (SSBU_RB_NET_PACE=0: no
+ *    SSBU_RB_SIM_LITE, default 49 / 127 here, 49 / 123 on Linux); then the next real pass waits for its 60 Hz tick (SSBU_RB_NET_PACE=0: no
  *    wait), and for the other player when it is more than SSBU_RB_NET_AHEAD frames behind.
  * Frames: the ring's base capture (the first safe point of the fight) is frame 0; real pass n is frame n.
  * No game content in this file. SPDX-License-Identifier: GPL-3.0-or-later */
