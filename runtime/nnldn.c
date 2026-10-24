@@ -79,6 +79,16 @@ enum { DR_NONE, DR_USER, DR_SYSTEM, DR_DESTROYED_BY_USER, DR_DESTROYED_BY_SYSTEM
 #define NI_ADV_SIZE 0x26a
 #define NI_ADV 0x26c
 #define NODE(i) (NI_NODES + 0x40 * (i))
+/* (2026-10-24) a byte of each node's reserved bytes (NodeInfo +0x30): 0x80 = written by a game that knows this byte, | 1 = its
+ * rollback is on for room matches. The host writes its own when it makes the room and a joiner's from its JOIN (byte 50 of
+ * the request, 0 from an older game = not known). It travels with the room's NetworkInfo (advertisements, the lobby's
+ * listings), so who has rollback is known before joining (F1 > Online rooms) and inside the room (F2). */
+#define NODE_RB 0x30
+static uint8_t rb_flag(void) {
+    static int f = -1;
+    if (f < 0) { int r1_net_on(void); const char *e = getenv("SSBU_RB_NET_ROOM_ROLLBACK"); f = 0x80 | (r1_net_on() && !(e && e[0] == '0') ? 1 : 0); }
+    return (uint8_t)f;
+}
 #define SEEN_MAX 24
 #define SILENT_MS 6000
 
@@ -193,8 +203,10 @@ static void ldn_receive(uint32_t from, const uint8_t *p, uint32_t n) {
                     nd[0xb] = 1;
                     memcpy(nd + 0xc, m + 16, 32);
                     memcpy(nd + 0x2e, m + 48, 2);
+                    nd[NODE_RB] = len >= 51 ? m[50] : 0;
                     L.net[NI_NODE_COUNT]++;
-                    if (LOGL(1)) printf("[online] ldn: %.32s joined the room as node %d\n", (const char *)nd + 0xc, i);
+                    if (LOGL(1)) printf("[online] ldn: %.32s joined the room as node %d (rollback %s)\n", (const char *)nd + 0xc, i,
+                                        !(nd[NODE_RB] & 0x80) ? "not known: an older game" : nd[NODE_RB] & 1 ? "on" : "off");
                     mark = "ldn:station-joined";
                 }
         if (node < 0) { uint8_t why = 1; ldn_msg(from, M_REJECT, &why, 1); break; }
@@ -363,6 +375,7 @@ static void create_network(Ctx *c, uint64_t config, uint64_t security, uint64_t 
     h[0xb] = 1;
     memcpy(h + 0xc, PTR(user), 32);
     memcpy(h + 0x2e, PTR(config + 0x14), 2);
+    h[NODE_RB] = rb_flag();
     set_state(LS_AP_CREATED);
     advertise();
     if (LOGL(1)) printf("[online] ldn: room created by %.32s (%u players at most, scene %04x)\n", (const char *)h + 0xc, n[NI_NODE_MAX], ld16(config + 0xa));
@@ -448,6 +461,7 @@ static void join(Ctx *c, const uint8_t *session, uint64_t user, uint16_t version
     memcpy(ask, session, 16);
     memcpy(ask + 16, PTR(user), 32);
     memcpy(ask + 48, &version, 2);
+    ask[50] = rb_flag();
     L.answer = 0;
     L.join_host = host;
     memcpy(L.join_session, session, 16);
@@ -494,6 +508,35 @@ uint32_t nnldn_other_ip(void) {
     return n == 1 ? r : 0;
 }
 int nnldn_role(void) { int s = L.state; return s == LS_AP_CREATED ? 1 : s == LS_STA_CONNECTED ? 2 : 0; }      /* (R3 pub1) 1 = this game made the room, 2 = it joined one, 0 = no room */
+/* the rollback byte of a player of this game's room: 1 on, 0 off, -1 not known (an older game, or not in the room) */
+int nnldn_node_rollback(uint32_t ip) {
+    AcquireSRWLockShared(&L.lock);
+    int i = in_network() ? node_index(ip) : -1, r = -1;
+    if (i >= 0) { uint8_t f = L.net[NODE(i) + NODE_RB]; r = f & 0x80 ? f & 1 : -1; }
+    ReleaseSRWLockShared(&L.lock);
+    return r;
+}
+/* the room hosted at host as last seen (a scan's listing or its advertisement): players, of them with rollback on, and of
+ * them whose byte is known; 0 = that room not seen in the last 10 s */
+int nnldn_seen_rollback(uint32_t host, int *players, int *on, int *known) {
+    uint64_t t = ms_now(), best = 0;
+    int ok = 0;
+    *players = *on = *known = 0;
+    AcquireSRWLockShared(&L.lock);
+    for (int i = 0; i < SEEN_MAX; i++) {
+        const uint8_t *n = L.seen[i].info;
+        if (!L.seen[i].at || t - L.seen[i].at > 10000 || u32at(n + NODE(0)) != host || L.seen[i].at <= best) continue;
+        best = L.seen[i].at; ok = 1; *players = *on = *known = 0;
+        for (int k = 0; k < 8; k++) {
+            if (!n[NODE(k) + 0xb]) continue;
+            uint8_t f = n[NODE(k) + NODE_RB];
+            (*players)++;
+            if (f & 0x80) { (*known)++; *on += f & 1; }
+        }
+    }
+    ReleaseSRWLockShared(&L.lock);
+    return ok;
+}
 int nnldn_has_node(uint32_t ip) {
     AcquireSRWLockShared(&L.lock);
     int in = in_network() && node_index(ip) >= 0;

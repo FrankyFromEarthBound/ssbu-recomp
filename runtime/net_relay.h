@@ -47,6 +47,7 @@ void nnldn_deliver(uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport, c
 void nnldn_listing(uint32_t seq, uint32_t owner, const uint8_t *info);
 void nnldn_list_end(uint32_t seq);
 int nnldn_has_node(uint32_t ip);        /* ip is a node of the network this player is in now */
+int nnldn_node_rollback(uint32_t ip);   /* that node's rollback byte: 1 on, 0 off, -1 not known */
 int nnldn_players(void);                /* players in this player's room (itself included), 0 = in no room; never blocks */
 /* net_stats_get (net_stats.h, the F2 overlay) is defined in net_relay.c */
 

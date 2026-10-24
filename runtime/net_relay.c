@@ -912,6 +912,10 @@ int net_rooms_get(NetRoom *out, int max, int *state) {
     n = g_nroom_list < max ? g_nroom_list : max;
     memcpy(out, g_room_list, sizeof *out * (size_t)n);
     ReleaseSRWLockShared(&g_rooms_lock);
+    int nnldn_seen_rollback(uint32_t host, int *players, int *on, int *known);
+    for (int i = 0; i < n; i++) {
+        out[i].rb_seen = nnldn_seen_rollback(out[i].host, &out[i].rb_players, &out[i].rb_on, &out[i].rb_known);
+    }
     return n;
 }
 const char *net_build_id(void) { configure(); return g_build; }
@@ -1639,8 +1643,8 @@ int net_peers_get(NetPeer *out, int max) {
     }
     ReleaseSRWLockShared(&g_peers_lock);
     for (int i = 0; i < n; i++) {
-        int h = rb_heard_ms(out[i].ip);
-        out[i].rollback = h >= 0 && h < 3000;
+        int h = rb_heard_ms(out[i].ip), r = nnldn_node_rollback(out[i].ip);
+        out[i].rollback = r >= 0 ? r : h >= 0 && h < 3000 ? 1 : -1;
         out[i].in_room = nnldn_has_node(out[i].ip);
     }
     return n;

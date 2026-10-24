@@ -31,7 +31,8 @@ typedef struct {
     int ping_ms;                            /* round trip of the direct path, smoothed (a hello every 400 ms); -1 = no direct path */
     int path;                               /* NET_PATH_*: still trying to open a direct path, direct, or through the lobby */
     int in_room;                            /* in this game's Local Wireless room now */
-    int rollback;                           /* a rollback message of its game heard in the last 3 s (its rollback is on) */
+    int rollback;                           /* its rollback for room matches: 1 on, 0 off, -1 not known (the byte of its room
+                                               entry, nnldn.c NODE_RB; else 1 when a rollback message of it was heard in 3 s) */
 } NetPeer;
 int net_peers_get(NetPeer *out, int max);
 
@@ -44,6 +45,9 @@ typedef struct {
     int players, most, open, mine, joinable, mods_known, nmods;
     char mods[256];                         /* the room's mods, comma separated ("" = none) */
     char why[256];                          /* joinable == 0: the cause */
+    int rb_seen, rb_players, rb_on, rb_known;   /* the room's NetworkInfo seen by this game in the last 10 s (the game's own
+                                               Rooms List scans it): its players, of them with rollback on, and those whose
+                                               setting is known */
 } NetRoom;
 /* the rooms (at most max) and the browser's state: 0 online off, 1 waiting for the lobby, 2 the lobby does not answer
  * (an older lobby), 3 listed. Calling it keeps the list fresh (asked every 2 s while called). Never blocks long. */

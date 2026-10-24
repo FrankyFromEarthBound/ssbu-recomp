@@ -1372,7 +1372,9 @@ static void draw_players(int lobby_ms) {
         else if (p.path == NET_PATH_TRYING) ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "connecting");
         else ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "via lobby");
         ImGui::TableNextColumn();
-        if (p.rollback) ImGui::TextColored(ImVec4(0.45f, 0.9f, 0.45f, 1), "rollback"); else ImGui::TextDisabled("-");
+        if (p.rollback > 0) ImGui::TextColored(ImVec4(0.45f, 0.9f, 0.45f, 1), "rollback");
+        else if (p.rollback == 0) ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "no rollback");
+        else ImGui::TextDisabled("-");
     }
     ImGui::EndTable();
 }
@@ -1484,11 +1486,12 @@ static void sec_rooms(void) {
     if (state == 1 && !n) { ImGui::TextDisabled("Asking the lobby..."); return; }
     if (state == 2) { ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "The lobby does not list rooms of other versions (an older lobby server): only the game's own list works."); return; }
     if (!n) { ImGui::TextDisabled("No room is open in this lobby right now. Create one: Local Wireless > Create Room."); return; }
-    if (ImGui::BeginTable("rooms", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp)) {
+    if (ImGui::BeginTable("rooms", 6, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("Host", ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableSetupColumn("Version", ImGuiTableColumnFlags_WidthStretch, 0.6f);
         ImGui::TableSetupColumn("Mods", ImGuiTableColumnFlags_WidthStretch, 1.6f);
         ImGui::TableSetupColumn("Players", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+        ImGui::TableSetupColumn("Rollback", ImGuiTableColumnFlags_WidthStretch, 0.7f);
         ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthStretch, 1.1f);
         ImGui::TableHeadersRow();
         for (int i = 0; i < n; i++) {
@@ -1507,6 +1510,9 @@ static void sec_rooms(void) {
             ImGui::TableNextColumn(); ImGui::TextUnformatted(r.version[0] ? r.version : "?");
             ImGui::TableNextColumn(); ImGui::PushTextWrapPos(0.0f); ImGui::TextUnformatted(r.mods[0] ? r.mods : "none"); ImGui::PopTextWrapPos();
             ImGui::TableNextColumn(); ImGui::Text("%d / %d", r.players, r.most);
+            ImGui::TableNextColumn();
+            if (!r.rb_seen || !r.rb_known) ImGui::TextDisabled("?");
+            else ImGui::TextColored(r.rb_on == r.rb_players ? ImVec4(0.45f, 0.9f, 0.45f, 1) : ImVec4(1, 0.8f, 0.2f, 1), "%d of %d on%s", r.rb_on, r.rb_players, r.rb_known < r.rb_players ? " (?)" : "");
             ImGui::TableNextColumn();
             if (r.mine) ImGui::TextDisabled("yours");
             else if (match_host && r.host == match_host) ImGui::TextColored(ImVec4(0.45f, 0.9f, 0.45f, 1), "YOUR MATCH: join it");
