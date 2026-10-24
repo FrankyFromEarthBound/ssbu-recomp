@@ -22,6 +22,7 @@ int rbn_delay(void); int rbn_rtt_ms(void); double rbn_offset_ms(void); void rbn_
 
 int rbn_match_cancelled(void); void rbn_match_reset(void); int rbn_match_number(void);      /* (hs12) */
 int rbn_agreed_pending(void);
+int rbn_room_rollback(void);
 void rbn_set_lockstep(int on); int rbn_loop(void);      /* (hs13) */
 /* (hs13) a match WITHOUT the ring (r1_ring.c g_rg_nomem: not enough memory for the snapshot ring, e.g. a PC short of commit
  * memory: tw1j crashed there): the pads are still exchanged, but every real pass waits until the other player's pad of
@@ -34,6 +35,12 @@ void input_mark(const char *what);                      /* nnhid.c: the input se
 /* (hs12) matches in one session: 0 = between matches, 1 = an online match runs (its base state made), 2 = a match that was
  * not agreed (handshake failed / given up) runs locally (Final Destination, one stock): no ring, and rbg_pad walks player 1 off the stage */
 static int g_rbg_in_match, g_rbg_rebase; static double g_rbg_quit_t0;
+/* (2026-10-24, owner: "the host left right as the game ended, my controller controls their stats view on the end screen, and
+ * no one controls mine") a room's rollback match is a local versus match (debug_mode.c: player i reads port i), and its
+ * results screen still is: on the joiner's game this PC's pad (port 1) drove the room maker's panel and nothing drove port 2,
+ * its own. Until the next match starts (at most 120 s) the joiner's pad is port 2's as well as port 1's. */
+static double g_rbg_post_until;
+static RbPad g_rbg_post_pad;
 /* (R3 net3, runs pe3 / pe4: DESYNC from frame 2) the base state is the first capture of the fight; when it cannot be made at the
  * first safe point with the fight on ("RA: first save: no quiet moment within 200 ms: not now"), it was made one pass later, and
  * that game called fight frame 218 "frame 0" while the other called 217 so: every frame one apart. Now the frames are counted
@@ -357,6 +364,11 @@ static void rbg_step(Ctx *c) {
 }
 /* nnhid.c (through r1_pad / r1_pad_id): the pad of port id (0 / 1) in the pass now running */
 static void rbg_pad(int id, uint64_t *b, int *lx, int *ly, int *rx, int *ry) {
+    if (g_rbg_post_until > 0 && (id == 0 || id == 1)) {
+        if (g_rbg_in_match || rbn_agreed_pending() || now_ms() > g_rbg_post_until) { g_rbg_post_until = 0; LOG("r1: RB NET: the joiner's pad is port 1's only again\n"); }
+        else if (id == 0) { g_rbg_post_pad.buttons = *b & 0xffffull; g_rbg_post_pad.lx = (int16_t)*lx; g_rbg_post_pad.ly = (int16_t)*ly; g_rbg_post_pad.rx = (int16_t)*rx; g_rbg_post_pad.ry = (int16_t)*ry; return; }
+        else { *b = g_rbg_post_pad.buttons; *lx = g_rbg_post_pad.lx; *ly = g_rbg_post_pad.ly; *rx = g_rbg_post_pad.rx; *ry = g_rbg_post_pad.ry; return; }
+    }
     if (g_rbg_in_match == 2 && (id == 0 || id == 1)) {  /* (hs12) a match that was not agreed: this PC's player 1 pauses, then holds L + R + A (the game's own way out of a match), again every 4 s */
         /* (debug_mode.c makes it Final Destination with one stock) player 1 walks off the left edge for 20 s, which ends the
          * match the game's own way (results, then the stage select and the character select: run hw2 showed that pause +
@@ -403,6 +415,10 @@ static void rbg_report(void);
 static void rbg_fight_off(void) {
     if (!g_rbg_in_match) return;
     if (g_rbg_in_match == 1) { rbg_report(); r1_ring_let_go(); if (g_rg_ready) r1_ring_release(); g_rbg_rebase = 1; }
+    if (g_rbg_in_match == 1 && rbn_room_rollback() && rbn_local_player() == 1) {
+        memset(&g_rbg_post_pad, 0, sizeof g_rbg_post_pad); g_rbg_post_until = now_ms() + 120000;
+        LOG("r1: RB NET: a room's rollback match is over: this game's pad drives port 2 (its own player's results) as well as port 1 until the next match\n");
+    }
     else if (g_rbg_in_match == 3) LOG("r1: RB NET: the Local Wireless room fight is over\n");
     else LOG("r1: RB NET: the match that was not agreed is over after %.1f s (player 1 walked off)\n", (now_ms() - g_rbg_quit_t0) / 1000.0);
     if (g_rg_nomem == 1) g_rg_nomem = 0;                /* (hs13) nothing was kept: the next match tries the ring again */
