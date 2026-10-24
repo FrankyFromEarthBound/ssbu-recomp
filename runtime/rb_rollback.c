@@ -21,6 +21,7 @@ void rbn_pass_hash(long long f); void rbn_finalize(long long cur); double rbn_pa
 int rbn_delay(void); int rbn_rtt_ms(void); double rbn_offset_ms(void); void rbn_resend(void); void rbn_status(char *out, size_t n); void rbn_hello(void); int rbn_peer_started(void); void rbn_choose_delay(void);
 
 int rbn_match_cancelled(void); void rbn_match_reset(void); int rbn_match_number(void);      /* (hs12) */
+int rbn_agreed_pending(void);
 void rbn_set_lockstep(int on); int rbn_loop(void);      /* (hs13) */
 /* (hs13) a match WITHOUT the ring (r1_ring.c g_rg_nomem: not enough memory for the snapshot ring, e.g. a PC short of commit
  * memory: tw1j crashed there): the pads are still exchanged, but every real pass waits until the other player's pad of
@@ -39,6 +40,7 @@ static int g_rbg_in_match, g_rbg_rebase; static double g_rbg_quit_t0;
  * from the first safe point with the fight on (g_rbg_ff_first) on both games: a base made `late` passes later is frame `late`,
  * and the passes before it get no pad (as frames 1..delay on the other game). SSBU_RB_NET_BASEFIX=0: the old way (test). */
 static long long g_rbg_ff_first = -1; static int g_rbg_basefix = -1;
+static long long g_rbg_pre_input;                     /* pad reads with input taken away before the base (rbg_pad), this match */
 static int g_rbg = -1;
 static int rbg_on(void) { if (g_rbg < 0) g_rbg = rbn_on() > 0; return g_rbg; }
 static long long g_rbg_rb, g_rbg_k[RG_MAXSLOT + 2], g_rbg_rerun, g_rbg_miss, g_rbg_stalls, g_rbg_capfail, g_rbg_capskip, g_rbg_lastlocal, g_rbg_real, g_rbg_gone;
@@ -188,7 +190,8 @@ static void rbg_step_body(Ctx *c) {
         if (!g_rbg_timer) g_rbg_timer = CreateWaitableTimerExW(NULL, NULL, 0x2 /* CREATE_WAITABLE_TIMER_HIGH_RESOLUTION */, TIMER_ALL_ACCESS);
         if (!g_rbg_timer) g_rbg_timer = CreateWaitableTimerExW(NULL, NULL, 0, TIMER_ALL_ACCESS);
         if (!g_rbg_work) { g_rbg_work = calloc(RBG_NT, sizeof *g_rbg_work); g_rbg_gap = calloc(RBG_NT, sizeof *g_rbg_gap); g_rbg_wcyc = calloc(RBG_NT, sizeof *g_rbg_wcyc); g_rbg_wk = calloc(RBG_NT, 1); }
-        LOG("r1: RB NET: match start, base state = frame %lld (fight frame %lld); pacing %s; re-run skip mask %d, lite mask %d%s\n", i, g_ff, g_rbg_pace ? "60 Hz" : "off", g_rgs_skip, g_rgs_lite, g_rgs_lastlite ? " (the last re-run pass too)" : "");
+        LOG("r1: RB NET: match start, base state = frame %lld (fight frame %lld); pacing %s; re-run skip mask %d, lite mask %d%s; pad reads with input before the base, taken away: %lld\n", i, g_ff, g_rbg_pace ? "60 Hz" : "off", g_rgs_skip, g_rgs_lite, g_rgs_lastlite ? " (the last re-run pass too)" : "", g_rbg_pre_input);
+        g_rbg_pre_input = 0;
         {   /* start barrier: both games begin frame 1 together (the one that finished loading first waits here, at frame 0,
              * instead of stalling seconds at frame 8 with states it might have to roll back to: rnh2 / rnh3 hung after that) */
             double tb = now_ms(), lastx = 0;
@@ -378,6 +381,10 @@ static void rbg_pad(int id, uint64_t *b, int *lx, int *ly, int *rx, int *ry) {
         if (id == 0 && el < 20000) stick = -32767;
         else if (id == 0) { long long t = (long long)(el - 20000) % 4000; if (t >= 300 && t < 450) bb = 1ull << 10; else if (t >= 1200 && t < 3600) bb = (1ull << 6) | (1ull << 7) | 1ull; }
         *b = bb; *lx = stick; *ly = *rx = *ry = 0; return;
+    }
+    if (!g_rbg_in_match && (id == 0 || id == 1) && rbn_agreed_pending()) {    /* an agreed match's loading and countdown, to the base: no input on either game (rb_net.c) */
+        if (*b || *lx || *ly || *rx || *ry) g_rbg_pre_input++;
+        *b = 0; *lx = *ly = *rx = *ry = 0; return;
     }
     if (!g_rbg_in_match && g_rbg_ff_first >= 0 && g_rbg_basefix > 0 && (id == 0 || id == 1)) { *b = 0; *lx = *ly = *rx = *ry = 0; return; }   /* (net3) a pass before a late base: no pad */
     if ((!g_rg_ready && !g_rbg_noring) || g_ra_off || !rbn_started() || id < 0 || id > 1) return;
