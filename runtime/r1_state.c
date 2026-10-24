@@ -1634,6 +1634,17 @@ static int ra_loader_busy(const Th *t) {
     static int on = -1; if (on < 0) { const char *e = getenv("SSBU_RB_LOADER_IDLE"); on = !(e && e[0] == '0'); }
     return on && rgs_wanted() && strstr(t->name, "ResLoadingThread") && !(t->c->in_import && strstr(t->c->in_import, "WaitEvent"));
 }
+/* (Linux, a human Local Wireless room) a task worker's own context says SwitchToFiber all the time a job fiber runs on it: one
+ * held there was taken as waiting while its job was inside VirtualAlloc (a system call, so "blocked"), holding the memory-map
+ * lock. Such a thread counts as at a wait only if the fiber it runs is at a waiting import (as ra_fibers_quiet asks later,
+ * but before the thread is held: nothing it holds can stop the hold). SSBU_RB_FIBER_HOLD=0: the old way. */
+Ctx *os_r1_running_fiber_ctx(DWORD tid);                /* os_threads.c */
+static int ra_fiber_busy(const Th *t) {
+    static int on = -1; if (on < 0) { const char *e = getenv("SSBU_RB_FIBER_HOLD"); on = !(e && e[0] == '0'); }
+    if (!on || !t->c->in_import || !strstr(t->c->in_import, "SwitchToFiber")) return 0;
+    Ctx *f = os_r1_running_fiber_ctx(GetThreadId(t->h));
+    return f && f != t->c && (!f->in_import || strstr(f->in_import, "SwitchToFiber") || !waiting_import(f->in_import));
+}
 static int ra_free(const char *n) { return strstr(n, "nopus") != NULL; }      /* never in a waiting import; its pages (decoder state, output) are not simulation */
 /* save: every other guest thread held inside a waiting import (its place and registers noted); 0 = one was not there in time */
 /* (R3 hs16, TEST ONLY) SSBU_RB_HOLD_PROF=1: where a hold's time goes, per thread (suspend + context + retries), and the
@@ -1660,6 +1671,7 @@ static int ra_hold_save(void) {
         Th *t = &g_th[g_nth++]; memset(t, 0, sizeof *t); t->h = h; t->c = tc; t->name = nm ? nm : "?";
     }
     g_ninfo = 0; while (guest_thread_info(g_ninfo, &tc, &nm, &h)) g_ninfo++;
+    os_r1_fibers(NULL);                                     /* the fiber cache built now, with no thread held (ra_fiber_busy) */
     static int all_first = -1; if (all_first < 0) { const char *e = getenv("SSBU_RB_HOLD_ALL"); all_first = rgs_wanted() && e && atoi(e) != 0; }      /* opt-in: saved ~0.07 ms only; rb2f1 crashed with it (cause not shown) */
     static uint8_t pre[256];                                /* (R2 round 3, ring only) every thread suspended first, then checked: the kernel delivers the suspends together */
     if (all_first) for (int i = 0; i < g_nth; i++) pre[i] = !ra_free(g_th[i].name) && SuspendThread(g_th[i].h) != (DWORD)-1;
@@ -1669,14 +1681,14 @@ static int ra_hold_save(void) {
         double t0 = now_ms();
         if (all_first && pre[i]) {
             pre[i] = 0;
-            if (waiting_import(t->c->in_import) && th_blocked(t->h) && !ra_loader_busy(t)) { t->held = 1; t->parked = 1; t->rsp = g_tb_rsp; t->rip = g_tb_rip; t->cok = 1; t->from = t->c->import_from; t->imp = t->c->in_import; t->regs = *t->c; continue; }
+            if (waiting_import(t->c->in_import) && !ra_fiber_busy(t) && th_blocked(t->h) && !ra_loader_busy(t)) { t->held = 1; t->parked = 1; t->rsp = g_tb_rsp; t->rip = g_tb_rip; t->cok = 1; t->from = t->c->import_from; t->imp = t->c->in_import; t->regs = *t->c; continue; }
             ResumeThread(t->h);
             for (int j = i + 1; j < g_nth; j++) if (pre[j]) { ResumeThread(g_th[j].h); pre[j] = 0; }      /* a thread not at a wait: the others go too (it may wait for one of them) */
         }
         int spins = 0;
         for (;;) {
             if (SuspendThread(t->h) == (DWORD)-1) break;
-            if (waiting_import(t->c->in_import) && th_blocked(t->h) && !ra_loader_busy(t)) { t->held = 1; t->parked = 1; t->rsp = g_tb_rsp; t->rip = g_tb_rip; t->cok = 1; break; }
+            if (waiting_import(t->c->in_import) && !ra_fiber_busy(t) && th_blocked(t->h) && !ra_loader_busy(t)) { t->held = 1; t->parked = 1; t->rsp = g_tb_rsp; t->rip = g_tb_rip; t->cok = 1; break; }
             ResumeThread(t->h); spins++;
             if (now_ms() - t0 > g_ra_park_ms) {
                 if (g_hp_on) hp_add(t->name, now_ms() - t0, spins);
