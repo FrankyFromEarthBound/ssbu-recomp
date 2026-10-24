@@ -25,6 +25,31 @@ static int g_gfx_stats;                              /* U1: stats_overlay = off 
 int gfx_stats_overlay(void) { gfx_options(); return g_gfx_stats; }
 int gfx_volume(void) { gfx_options(); return g_gfx_volume; }
 const char *gfx_language(void) { gfx_options(); return g_gfx_language; }
+static char g_gfx_aspect_text[16] = "16:9";          /* aspect = 16:9 | 4:3 | W:H | a number (aspect.c) */
+static float g_gfx_aspect = 16.0f / 9.0f;
+/* "W:H" or a number; 0 when it is neither. 1.0 .. 4.0 (square to beyond 32:9). */
+static float aspect_parse(const char *s) {
+    float w = (float)atof(s), h = 1.0f;
+    const char *c = strchr(s, ':');
+    if (c) h = (float)atof(c + 1);
+    if (w <= 0 || h <= 0) return 0;
+    w /= h;
+    return w < 1.0f ? 1.0f : w > 4.0f ? 4.0f : w;
+}
+float gfx_aspect(void) {
+    static float v = -1.0f;
+    if (v < 0) {
+        const GfxOptions *o = gfx_options();
+        const char *e = getenv("SSBU_ASPECT"), *r = getenv("SSBU_RENDERER");
+        int gl = r && r[0] ? !_stricmp(r, "gl") || !_stricmp(r, "opengl") : o->renderer;
+        float a = e && e[0] && aspect_parse(e) > 0 ? aspect_parse(e) : g_gfx_aspect;
+        if (e && e[0]) snprintf(g_gfx_aspect_text, sizeof g_gfx_aspect_text, "%s", e);
+        if (gl && a != 16.0f / 9.0f) printf("graphics options: aspect=%s is ignored by the OpenGL renderer (Vulkan only): 16:9\n", g_gfx_aspect_text);
+        v = gl ? 16.0f / 9.0f : a;
+    }
+    return v;
+}
+const char *gfx_aspect_text(void) { gfx_aspect(); return g_gfx_aspect_text; }
 
 static const char *const k_default_ini =
 "; graphics.ini: display and rendering options of the native build (read once at start by gfx_options.c).\r\n"
@@ -92,6 +117,14 @@ static const char *const k_default_ini =
 ";   with the square): 1.5 = 2880x1620, 2.0 = 3840x2160 (a 4K screen pixel for pixel); a picture more than twice the\r\n"
 ";   window is reduced to it in 2:1 steps (supersampling). Details and limits: plan\\phases\\O1_options.md.\r\n"
 "resolution_scale = 1.0\r\n"
+"\r\n"
+"; aspect = 16:9 | 16:10 | 4:3 | 5:4 | 21:9 | <width>:<height>      (Vulkan; read at start)\r\n"
+";   The shape of the screen the game is shown on. 16:9 is the game's own. Another shape: the 3D view is made for it\r\n"
+";   and fills the window (4:3 in a fight: nearly the width of 16:9 and more above and below it; a screen with a fixed\r\n"
+";   camera, as the results, keeps the height and shows less at the sides); the 2D interface keeps its 16:9 shape, in\r\n"
+";   the middle. The window or screen should have that shape (borderless / fullscreen on a monitor of that shape, or\r\n"
+";   width and height of that shape); otherwise there are black bars. The fight itself is the same in every shape.\r\n"
+"aspect = 16:9\r\n"
 "\r\n"
 "; anisotropic_filtering = game | 2 | 4 | 8 | 16      (Vulkan)\r\n"
 ";   game: each texture sampler keeps the value the game gave it. A number: at least that much on every sampler that\r\n"
@@ -208,6 +241,7 @@ static BOOL CALLBACK opt_load(PINIT_ONCE once, PVOID arg, PVOID *ctx) {
         else if (!_stricmp(key, "gpu")) { if (_stricmp(val, "auto")) snprintf(o->gpu, sizeof o->gpu, "%s", val); }
         else if (!_stricmp(key, "console_mode")) o->handheld = !_stricmp(val, "handheld");
         else if (!_stricmp(key, "resolution_scale")) { float v = (float)atof(val); if (v > 0) o->scale = v; }
+        else if (!_stricmp(key, "aspect")) { float v = aspect_parse(val); if (v > 0) { g_gfx_aspect = v; snprintf(g_gfx_aspect_text, sizeof g_gfx_aspect_text, "%s", val); } }
         else if (!_stricmp(key, "anisotropic_filtering")) { int v = atoi(val); o->aniso = v == 2 || v == 4 || v == 8 || v == 16 ? v : 0; }
         else if (!_stricmp(key, "frame_time_overlay")) o->overlay = !_stricmp(val, "on") || !strcmp(val, "1");
         else if (!_stricmp(key, "profile")) o->profile = !_stricmp(val, "low");

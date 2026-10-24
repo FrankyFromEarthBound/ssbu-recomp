@@ -356,6 +356,7 @@ static const char *const k_wait[] = {"hold", "skip"};
 static const char *const k_prepare[] = {"first_run", "background", "off"};
 static const char *const k_load[] = {"start", "loading"};
 static const char *const k_console[] = {"docked", "handheld"};
+static const char *const k_aspect[] = {"16:9", "16:10", "4:3", "5:4", "21:9", "32:9"};      /* aspect.c; another W:H written in the file stays as it is */
 static const char *const k_onoff[] = {"off", "on"};
 static const char *const k_lang[] = {"auto", "ja", "en-US", "en-GB", "fr", "fr-CA", "de", "it", "es", "es-419", "zh-Hans", "zh-Hant", "ko", "nl", "ru"};
 static const char *const k_lang_name[] = {"auto (Windows display language)", "Japanese", "English (US)", "English (UK)", "French", "French (Canada)", "German", "Italian",
@@ -366,6 +367,7 @@ static const char *const k_size_name[] = {"1280 x 720", "1600 x 900", "1920 x 10
 
 struct Settings {
     int window, size, vsync, latency, renderer, aniso, profile, wait, prepare, load, console, overlay, volume, runahead, lang, kb_player, stats;
+    int aspect;                      /* index of k_aspect, -1 = another shape written in graphics.ini */
     float scale;
     char gpu[64];
 };
@@ -387,6 +389,7 @@ static void settings_init(int cw, int ch) {
     S.size = -1; for (int i = 0; i < N(k_sizes); i++) if (k_sizes[i][0] == o->width && k_sizes[i][1] == o->height) S.size = i;
     S.kb_player = nnpad_kb_player_cfg();
     S.stats = gfx_stats_overlay();
+    S.aspect = -1; for (int i = 0; i < N(k_aspect); i++) if (!strcmp(k_aspect[i], gfx_aspect_text())) S.aspect = i;
     S0 = S;
     (void)cw; (void)ch;
 }
@@ -394,7 +397,7 @@ static void ini(const char *key, const char *value) { gfx_ini_set(key, value); }
 static int restart_pending(void) {
     return S.vsync != S0.vsync || S.latency != S0.latency || S.renderer != S0.renderer || S.aniso != S0.aniso || S.profile != S0.profile || S.wait != S0.wait ||
            S.prepare != S0.prepare || S.load != S0.load || S.console != S0.console || S.runahead != S0.runahead || S.lang != S0.lang ||
-           fabsf(S.scale - S0.scale) > 0.001f || strcmp(S.gpu, S0.gpu);
+           fabsf(S.scale - S0.scale) > 0.001f || strcmp(S.gpu, S0.gpu) || S.aspect != S0.aspect;
 }
 static void apply_stats(int on) {            /* live: the stats box (F2) */
     S.stats = on;
@@ -614,6 +617,12 @@ static void sec_graphics(void) {
     if (ImGui::IsItemDeactivatedAfterEdit()) { char v[16]; snprintf(v, sizeof v, "%.2f", S.scale); ini("resolution_scale", v); }
     tag(1, fabsf(S.scale - S0.scale) > 0.001f);
     ImGui::TextDisabled("1.00 = 1920 x 1080 inside; 0.50 = 960 x 540 (weak GPU); above 1 = supersampling (strong GPU)");
+    if (ImGui::BeginCombo("Aspect ratio", S.aspect >= 0 ? k_aspect[S.aspect] : gfx_aspect_text())) {
+        for (int i = 0; i < N(k_aspect); i++) if (ImGui::Selectable(k_aspect[i], S.aspect == i)) { S.aspect = i; ini("aspect", k_aspect[i]); }
+        ImGui::EndCombo();
+    }
+    tag(1, S.aspect != S0.aspect);
+    ImGui::TextDisabled("the shape of the screen (Vulkan): the 3D view fills it, the 2D interface stays 16:9 in the middle");
     if (combo("Anisotropic filtering", &S.aniso, k_aniso, N(k_aniso))) ini("anisotropic_filtering", k_aniso[S.aniso]);
     tag(1, S.aniso != S0.aniso);
     if (combo("Profile", &S.profile, k_profile, N(k_profile))) ini("profile", k_profile[S.profile]);

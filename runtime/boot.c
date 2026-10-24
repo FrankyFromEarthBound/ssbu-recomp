@@ -272,6 +272,7 @@ static DWORD WINAPI guest_main(LPVOID arg) {
     }
 
     { void debug_mode_init(void); debug_mode_init(); }       /* debug_mode.c: test-only fast mode, nothing without SSBU_* variables */
+    { void aspect_init(void); aspect_init(); }               /* aspect.c: graphics.ini aspect other than 16:9: the cameras are made for it */
     printf("[phase 3] nnMain\n");
     trace_printf("=== phase 3: nnMain\n");
     call_guest(&c, NN_MAIN);

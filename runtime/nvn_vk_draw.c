@@ -287,6 +287,7 @@ static struct {
     int scissor[4], have_viewport, have_scissor, rast_discard, depth_clamp, restart, render_off;
     int ncol; TargetRef col[8], depth; int have_targets;
     int64_t row_stride, image_stride;
+    int ar_ui;                                     /* aspect.c: the draw being prepared is one of the 2D interface (ar_ui_draw); its viewport and scissor go into the 16:9 box */
     int dyn_dirty, vi_dirty, dyn3_dirty, dyn3_samples;      /* dyn3: the extended-dynamic-state-3 group (blend, masks, polygon mode, multisample) */
     void *pipe_bound;
     LONG64 frame_draws, frame_skipped, frame_clears, pipelines, modules, uploads, upload_bytes, images, images_live, views, ring_wraps, feedback, flushes, sets;
@@ -575,6 +576,42 @@ static LONG64 g_rs_mixed;
 static int wintex_is(const Tex *t) { if (nvn_front_tex_is_window(t)) return 1; for (int i = 0; i < 8; i++) if (g_wintex[i] == t) return 1; return 0; }
 static void wintex_note(Tex *t) { if (!t || wintex_is(t)) return; for (int i = 0; i < 8; i++) if (!g_wintex[i]) { g_wintex[i] = t; return; } }
 static int rs_ui_native(void) { static int on = -1; if (on < 0) on = getenv("SSBU_VK_UI_NATIVE") && atoi(getenv("SSBU_VK_UI_NATIVE")); return on; }
+/* aspect.c (graphics.ini aspect other than 16:9): the game's 16:9 targets hold a 3D picture drawn for the aspect A and the
+ * present shows the window texture at A. The 2D interface is drawn after the 3D picture into the texture the window
+ * texture is then copied from (the "canvas"; measured in a fight: 1920x1080 RGBA8, one full-screen draw without depth =
+ * the 3D picture made displayable, then about 110 interface draws, then one draw copies it into the window texture). Its
+ * viewports and scissors are put into the box of the canvas that is 16:9 once shown at A: the whole width and a band in
+ * the middle when A is narrower (4:3: 810 of 1080 rows), the whole height and a band in the middle when wider.
+ * The canvas is learnt: the colour target drawn last before a draw into a window texture (the scenes make their own:
+ * the one of the frame before is used). In each frame its first draw without a depth target is the 3D picture (left as it
+ * is); every other draw into it is the interface's. */
+static float g_ar = -1.0f;
+static float ar_aspect(void) { if (g_ar < 0) g_ar = gfx_aspect(); return g_ar; }
+#define AR_ON (ar_aspect() != 16.0f / 9.0f)
+static Tex *g_ar_canvas, *g_ar_last;
+static int g_ar_seen3d;                            /* this frame's 3D picture has been drawn into the canvas */
+static int g_ar_changes;
+static int ar_ui_draw(void) {
+    Tex *c0 = R.ncol ? R.col[0].tex : NULL;
+    if (!c0) return 0;
+    if (wintex_is(c0)) {
+        if (g_ar_last && g_ar_last != g_ar_canvas) {
+            g_ar_canvas = g_ar_last;
+            if (++g_ar_changes <= 20) { printf("aspect: the 2D interface's texture (%d): %dx%d format 0x%x, frame %lld\n", g_ar_changes, g_ar_canvas->b.width, g_ar_canvas->b.height, (int)g_ar_canvas->b.format, (long long)g_cur_frame); fflush(stdout); }
+        }
+        return 0;
+    }
+    g_ar_last = c0;
+    if (c0 != g_ar_canvas) return 0;
+    if (!g_ar_seen3d && !R.depth.tex) { g_ar_seen3d = 1; return 0; }
+    return 1;
+}
+/* The box in the canvas's own pixels (gw x gh, the game's size): kx, ky the scale, bx, by the corner. */
+static void ar_box(float gw, float gh, float *kx, float *ky, float *bx, float *by) {
+    float f = ar_aspect() / (16.0f / 9.0f);
+    *kx = f > 1.0f ? 1.0f / f : 1.0f; *ky = f < 1.0f ? f : 1.0f;
+    *bx = gw * (1.0f - *kx) * 0.5f; *by = gh * (1.0f - *ky) * 0.5f;
+}
 static VTex *g_vtex_all;
 static struct { VTex *vt; uint64_t serial; } *g_garbage;
 static int g_ngarbage, g_garbage_cap;
@@ -1741,11 +1778,20 @@ static void set_dynamic_state(void) {
     VkRect2D sc;
     uint64_t d = R.ds;
     float x = R.have_viewport ? R.viewport[0] : 0, y = R.have_viewport ? R.viewport[1] : 0, w = R.have_viewport ? R.viewport[2] : (float)R.pass_w, h = R.have_viewport ? R.viewport[3] : (float)R.pass_h;
+    float akx = 1, aky = 1, abx = 0, aby = 0;
+    if (R.ar_ui) {                                 /* aspect.c: an interface draw: its rectangles go into the 16:9 box (game pixels, before track O) */
+        ar_box((float)R.col[0].tex->b.width, (float)R.col[0].tex->b.height, &akx, &aky, &abx, &aby);
+        if (R.have_viewport) { x = abx + x * akx; y = aby + y * aky; w *= akx; h *= aky; }
+    }
     if (R.pass_rs && R.have_viewport) { x *= R.pass_sx; w *= R.pass_sx; y *= R.pass_sy; h *= R.pass_sy; }      /* track O: the game's rectangle on the scaled image */
     vp.x = x; vp.y = y + h; vp.width = w; vp.height = -h; vp.minDepth = R.drange[0]; vp.maxDepth = R.drange[1];      /* NVN upper-left origin: clip y = +1 is row y (design, section 3) */
     if (vp.minDepth < 0) vp.minDepth = 0; if (vp.maxDepth > 1) vp.maxDepth = 1;
     vkCmdSetViewport(R.cmd, 0, 1, &vp);
     int sx = R.have_scissor ? R.scissor[0] : 0, sy = R.have_scissor ? R.scissor[1] : 0, sw = R.have_scissor ? R.scissor[2] : R.pass_w, sh = R.have_scissor ? R.scissor[3] : R.pass_h;
+    if (R.ar_ui && R.have_scissor) {
+        int x0 = (int)floorf(abx + (float)sx * akx), y0 = (int)floorf(aby + (float)sy * aky), x1 = (int)ceilf(abx + (float)(sx + sw) * akx), y1 = (int)ceilf(aby + (float)(sy + sh) * aky);
+        sx = x0; sy = y0; sw = x1 - x0; sh = y1 - y0;
+    }
     if (R.pass_rs && R.have_scissor) rs_rect(&sx, &sy, &sw, &sh);
     if (sx < 0) { sw += sx; sx = 0; } if (sy < 0) { sh += sy; sy = 0; }
     if (sx > R.pass_w) sx = R.pass_w; if (sy > R.pass_h) sy = R.pass_h;
@@ -2689,6 +2735,7 @@ static int draw_prepare(unsigned prim) {
     if (!p) return 0;                              /* shader_wait = skip: the pipeline is being made by a worker, the draw is left out (counted in pipe_get) */
     if (!R.pipe_bound) R.dyn3_dirty = 1;          /* a new command buffer, or a pipeline of our own with static state was bound */
     if (R.pipe_bound != p) { vkCmdBindPipeline(R.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, p->p); R.pipe_bound = p; }
+    if (AR_ON) { int ui = ar_ui_draw(); if (ui != R.ar_ui) { R.ar_ui = ui; R.dyn_dirty = 1; } }      /* aspect.c */
     if (R.dyn_dirty) { set_dynamic_state(); R.dyn_dirty = 0; }
     if (D.has_eds3 && (R.dyn3_dirty || R.dyn3_samples != k.samples)) { set_dynamic_state3(k.samples); R.dyn3_dirty = 0; }
     vkCmdSetPrimitiveTopology(R.cmd, (VkPrimitiveTopology)topo[prim]);
@@ -3871,7 +3918,8 @@ swap: ;
             /* PR #24 (v1Ta44): the picture keeps its shape (display.c display_fit): black bars when the window is not 16:9 */
             void display_fit(int sw, int sh, int dw, int dh, int out[4]);
             int d4[4];
-            display_fit(16, 9, (int)V.extent.width, (int)V.extent.height, d4);
+            if (AR_ON) display_fit((int)(ar_aspect() * 10000.0f + 0.5f), 10000, (int)V.extent.width, (int)V.extent.height, d4);      /* aspect.c: the picture was drawn for that shape */
+            else display_fit(16, 9, (int)V.extent.width, (int)V.extent.height, d4);
             if (vt->rs && vt->sx > 1.0f) rs_reduce(&src, s4, d4[2], d4[3]);      /* PR #8 (stephenjayakar): track O, supersampling: halved in 2:1 steps to at most twice the picture */
             memset(&b, 0, sizeof b);
             b.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; b.srcSubresource.layerCount = 1; b.dstSubresource = b.srcSubresource;
@@ -4018,6 +4066,7 @@ swap: ;
     }
     if (frame % 600 == 0) { printf("nvn_vk: images made per NVN texture format (format:count):"); for (int i = 0; i < 256; i++) if (g_fmt_hist[i]) printf(" 0x%x:%u", i, g_fmt_hist[i]); printf("\n"); }
     R.frame_draws = R.frame_skipped = R.frame_clears = 0;
+    g_ar_seen3d = 0;                               /* aspect.c */
     {   /* Round 17: a present job that took long, in parts (default: 4 ms and more, at most 400 lines a run;
          * SSBU_VK_PRESENTLOG=<ms>, 0 = off). tp[3] is 0 when no swapchain image could be acquired. */
         static int lim = -1, nl;

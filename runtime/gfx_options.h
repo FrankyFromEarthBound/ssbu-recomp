@@ -25,6 +25,8 @@ int gfx_stats_overlay(void);              /* stats_overlay = off 0 | on 1 (menu.
 int gfx_menu(void);                       /* menu = off 0 | on 1 (the in-game settings menu, F1) */
 int gfx_volume(void);                     /* volume = auto -1 | 0..100 (the copies a person plays; nnaudio.c) */
 const char *gfx_language(void);           /* language = auto "" | a language code of the game (nnmisc.c) */
+float gfx_aspect(void);                   /* aspect = 16:9 | 4:3 | W:H | a number: width / height of the picture (aspect.c; Vulkan only, 16/9 with OpenGL); env SSBU_ASPECT wins */
+const char *gfx_aspect_text(void);        /* the aspect as written ("16:9" when the key is missing) */
 void gfx_set_overlay(int on);             /* frame_time_overlay, changed while running */
 int gfx_ini_set(const char *key, const char *value);      /* writes `key = value` into graphics.ini (the line replaced, comments kept; appended when missing); 1 = written */
 #endif
