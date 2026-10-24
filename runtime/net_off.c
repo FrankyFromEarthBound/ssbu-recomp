@@ -24,7 +24,8 @@ const char *net_room_code(void) { return ""; }
 const char *net_lan_code(void) { return ""; }
 const char *net_upnp_result(void) { return ""; }
 #include "net_stats.h"
-void net_stats_get(NetStats *o) { memset(o, 0, sizeof *o); o->state = NET_OFFLINE; o->ping_ms = -1; }
+void net_stats_get(NetStats *o) { memset(o, 0, sizeof *o); o->state = NET_OFFLINE; o->ping_ms = o->lobby_ms = -1; }
+int net_peers_get(NetPeer *out, int max) { (void)out; (void)max; return 0; }
 int net_rooms_get(NetRoom *out, int max, int *state) { (void)out; (void)max; if (state) *state = 0; return 0; }
 const char *net_build_id(void) { return ""; }
 const char *net_mods_text(void) { return "none"; }

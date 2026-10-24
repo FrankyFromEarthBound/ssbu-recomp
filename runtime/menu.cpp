@@ -117,9 +117,11 @@ extern "C" void menu_popup(const char *title, const char *text) {
 }
 static int popup_on(void) { return (ULONGLONG)g_popup_until > GetTickCount64(); }
 /* net_stats.h: the default answer until the online code defines net_stats_get itself */
-extern "C" void net_stats_get_default(NetStats *o) { memset(o, 0, sizeof *o); o->state = NET_OFFLINE; o->ping_ms = -1; }
+extern "C" void net_stats_get_default(NetStats *o) { memset(o, 0, sizeof *o); o->state = NET_OFFLINE; o->ping_ms = o->lobby_ms = -1; }
+extern "C" int net_peers_get_default(NetPeer *out, int max) { (void)out; (void)max; return 0; }
 #ifdef _WIN32
 #pragma comment(linker, "/alternatename:net_stats_get=net_stats_get_default")
+#pragma comment(linker, "/alternatename:net_peers_get=net_peers_get_default")
 #endif                                               /* (Linux / macOS: net_off.c or net_relay.c defines net_stats_get) */
 static volatile LONG g_stats_req;                    /* F2 */
 static int g_asserts;
@@ -1348,6 +1350,32 @@ static void sec_log(void) {
 }
 
 /* ------------------------------------------------------------------ the stats overlay (F2), top right */
+/* the players the lobby introduced (net_peers_get): name, round trip of the direct path, the path, whether their rollback is on */
+static ImVec4 ping_colour(int ms) {
+    return ms < 0 ? ImVec4(0.7f, 0.7f, 0.7f, 1) : ms < 80 ? ImVec4(0.45f, 0.9f, 0.45f, 1) : ms < 150 ? ImVec4(1, 0.8f, 0.2f, 1) : ImVec4(1, 0.4f, 0.4f, 1);
+}
+static void draw_players(int lobby_ms) {
+    NetPeer pl[8];
+    int n = net_peers_get(pl, 8);
+    if (lobby_ms >= 0) { ImGui::TextDisabled("lobby server"); ImGui::SameLine(); ImGui::TextColored(ping_colour(lobby_ms), "%d ms", lobby_ms); }
+    if (n <= 0) return;
+    if (!ImGui::BeginTable("##players", 4, ImGuiTableFlags_SizingFixedFit)) return;
+    for (int i = 0; i < n; i++) {
+        const NetPeer &p = pl[i];
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        if (p.in_room) ImGui::TextUnformatted(p.name[0] ? p.name : "?"); else ImGui::TextDisabled("%s", p.name[0] ? p.name : "?");
+        ImGui::TableNextColumn();
+        if (p.ping_ms >= 0) ImGui::TextColored(ping_colour(p.ping_ms), "%d ms", p.ping_ms); else ImGui::TextDisabled("- ms");
+        ImGui::TableNextColumn();
+        if (p.path == NET_PATH_DIRECT) ImGui::TextDisabled("direct");
+        else if (p.path == NET_PATH_TRYING) ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "connecting");
+        else ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "via lobby");
+        ImGui::TableNextColumn();
+        if (p.rollback) ImGui::TextColored(ImVec4(0.45f, 0.9f, 0.45f, 1), "rollback"); else ImGui::TextDisabled("-");
+    }
+    ImGui::EndTable();
+}
 static void draw_stats(void) {
     float sum = 0;
     int n = 0;
@@ -1372,6 +1400,7 @@ static void draw_stats(void) {
         if (ns.ping_ms >= 0) ImGui::Text("ping %d ms  delay %d f", ns.ping_ms, ns.delay); else ImGui::Text("ping -  delay %d f", ns.delay);
         ImGui::Text("rollback %d / %d f", ns.rollback_last, ns.rollback_max);
     }
+    if (ns.state == NET_CONNECTED) draw_players(ns.lobby_ms);
     ImGui::Text("run-ahead %s", !ra_cfg ? "off" : r1_ra_phase() ? "on (running)" : "on");
     ImGui::End();
 }

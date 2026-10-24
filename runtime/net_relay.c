@@ -379,7 +379,7 @@ typedef struct {
     uint32_t ip;
     char name[NAME_LEN + 1];
     uint64_t secret, since, last_ack, next_hello, acks_window;
-    int state, via, ncand, acks, rtt;
+    int state, via, ncand, acks, rtt, rtt_avg;        /* rtt: the last hello answer; rtt_avg: smoothed over the last few (F2 overlay) */
     Cand cand[2];                                     /* through its router (as the lobby sees it), then on its own LAN */
 } Peer;
 static SRWLOCK g_peers_lock = SRWLOCK_INIT;
@@ -474,6 +474,17 @@ static const char *ip_text(uint32_t ip, char *b);
 static volatile uint32_t g_rb_match_peer;              /* (R3 net3) the opponent of the last rollback-match search (lobby 1.4), 0 = none */
 static volatile LONG64 g_rb_rx_other;                  /* (R3 net3) rollback messages from another player than that opponent: dropped */
 static volatile LONG g_rb_nodst; static volatile uint32_t g_rb_dst_said;
+/* the F2 overlay's "rollback" column: when a rollback message of each player was last heard (written by the receive thread only) */
+static struct { volatile uint32_t ip; volatile LONG64 at; } g_rb_heard[8];
+static void rb_heard_from(uint32_t ip) {
+    int k = 0;
+    for (int i = 0; i < 8; i++) { if (g_rb_heard[i].ip == ip) { k = i; break; } if (g_rb_heard[i].at < g_rb_heard[k].at) k = i; }
+    g_rb_heard[k].ip = ip; InterlockedExchange64(&g_rb_heard[k].at, (LONG64)ms_now());
+}
+static int rb_heard_ms(uint32_t ip) {
+    for (int i = 0; i < 8; i++) if (g_rb_heard[i].ip == ip && g_rb_heard[i].at) return (int)(ms_now() - (uint64_t)g_rb_heard[i].at);
+    return -1;
+}
 int net_rb_no_destination(void) { return g_rb_nodst; }
 int net_rb_send(const void *p, int n) {
     if (!net_rb_ready() || n <= 0 || n > 1400) return 0;
@@ -539,7 +550,7 @@ static void read_peers(const uint8_t *p, int n) {               /* PEERS body */
         int same = old && old->ncand == q->ncand;
         for (int c = 0; same && c < q->ncand; c++) same = same_at(&old->cand[c].at, &q->cand[c].at);
         if (same) {
-            q->state = old->state; q->via = old->via; q->since = old->since; q->last_ack = old->last_ack; q->rtt = old->rtt;
+            q->state = old->state; q->via = old->via; q->since = old->since; q->last_ack = old->last_ack; q->rtt = old->rtt; q->rtt_avg = old->rtt_avg;
             q->next_hello = old->next_hello; q->acks = old->acks; q->acks_window = old->acks_window;
             memcpy(q->cand, old->cand, sizeof q->cand);
         } else {
@@ -631,6 +642,7 @@ static void from_player(const uint8_t *p, int n, const struct sockaddr_in *from)
             if (word && asked && t - asked < 2000) {
                 if (word == k->hello) k->hello = 0; else k->prev = 0;
                 q->rtt = (int)(t - asked);
+                q->rtt_avg = q->rtt_avg > 0 ? (3 * q->rtt_avg + q->rtt + 2) / 4 : q->rtt;
                 q->last_ack = t;
                 if (q->state != PS_DIRECT || (c == 1 && q->via == 0)) {
                     char at[24];
@@ -1484,7 +1496,7 @@ static DWORD WINAPI client_thread(LPVOID unused) {
         case T_RB:                                       /* R3: a rollback message of the other player */
             if (n > 8 && g_joined) { uint32_t src = g32(buf + 4), mp = g_rb_match_peer;
                 if (mp && src != mp && !nnldn_other_ip()) { InterlockedIncrement64(&g_rb_rx_other); break; }     /* (R3 net3) not our opponent */
-                if (src && src != g_ip) { g_rb_peer = src; rbn_rx(buf + 8, n - 8); } }
+                if (src && src != g_ip) { g_rb_peer = src; rb_heard_from(src); rbn_rx(buf + 8, n - 8); } }
             break;
         }
     }
@@ -1542,10 +1554,11 @@ void net_start(void) {
  *   delay, rollback_*  0: the game's own Local Wireless netcode is delay based and is not ours to measure (rollback, N1). */
 void net_stats_get(NetStats *o) {
     memset(o, 0, sizeof *o);
-    o->ping_ms = -1;
+    o->ping_ms = o->lobby_ms = -1;
     if (g_cfg <= 0) { o->state = NET_OFFLINE; return; }
     if (!g_joined) { o->state = net_lobby_gone() || g_reject[0] ? NET_DISCONNECTED : NET_CONNECTING; return; }
     o->state = NET_CONNECTED;
+    o->lobby_ms = (int)g_ping;
     {   /* R3: an online rollback match (rb_net.c / rb_rollback.c) fills delay and rollback; its own round trip */
         int rbn_started(void), rbn_rtt_ms(void); void rbn_stats(int *delay, int *last, int *maxk);
         if (rbn_started()) { rbn_stats(&o->delay, &o->rollback_last, &o->rollback_max); o->players = 2; o->ping_ms = rbn_rtt_ms(); return; }
@@ -1558,6 +1571,28 @@ void net_stats_get(NetStats *o) {
         for (int i = 0; i < g_npeers; i++) if (fresh(&g_peers[i], t)) { o->ping_ms = g_peers[i].rtt; break; }
         ReleaseSRWLockShared(&g_peers_lock);
     }
+}
+/* net_stats.h: the F2 overlay's player list: the players the lobby introduced to this game, read once per drawn frame on the
+ * render thread (a try-lock: 0 players for a frame rather than a wait). */
+int net_peers_get(NetPeer *out, int max) {
+    if (g_cfg <= 0 || !g_joined || max <= 0 || !TryAcquireSRWLockShared(&g_peers_lock)) return 0;
+    uint64_t t = ms_now();
+    int n = 0;
+    for (int i = 0; i < g_npeers && n < max; i++) {
+        const Peer *q = &g_peers[i];
+        NetPeer *o = &out[n++];
+        o->ip = q->ip;
+        memcpy(o->name, q->name, sizeof o->name - 1); o->name[sizeof o->name - 1] = 0;
+        o->path = fresh(q, t) ? NET_PATH_DIRECT : q->state == PS_PUNCHING ? NET_PATH_TRYING : NET_PATH_LOBBY;
+        o->ping_ms = o->path == NET_PATH_DIRECT && q->rtt_avg > 0 ? q->rtt_avg : -1;
+    }
+    ReleaseSRWLockShared(&g_peers_lock);
+    for (int i = 0; i < n; i++) {
+        int h = rb_heard_ms(out[i].ip);
+        out[i].rollback = h >= 0 && h < 3000;
+        out[i].in_room = nnldn_has_node(out[i].ip);
+    }
+    return n;
 }
 
 void net_status(char *out, size_t n) {

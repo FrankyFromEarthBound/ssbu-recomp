@@ -43,7 +43,7 @@ void menu_shot_done(const char *path, int w, int h, int ok) { (void)path; (void)
 void menu_assert_fail(const char *what, const char *file, int line) { (void)what; (void)file; (void)line; }
 
 /* net_stats.h: the default answer until the online code defines net_stats_get itself (as in menu.cpp) */
-void net_stats_get_default(NetStats *o) { memset(o, 0, sizeof *o); o->state = NET_OFFLINE; o->ping_ms = -1; }
+void net_stats_get_default(NetStats *o) { memset(o, 0, sizeof *o); o->state = NET_OFFLINE; o->ping_ms = o->lobby_ms = -1; }
 #pragma comment(linker, "/alternatename:net_stats_get=net_stats_get_default")
 #ifndef _WIN32
 /* Linux / macOS (display.c's SDL window thread): nothing to take from the window without the menu */

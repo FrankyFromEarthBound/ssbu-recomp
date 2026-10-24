@@ -17,8 +17,23 @@
 extern "C" {
 #endif
 enum { NET_OFFLINE = 0, NET_CONNECTING = 1, NET_CONNECTED = 2, NET_DISCONNECTED = 3 };
-typedef struct { int state; int players; int ping_ms; int delay; int rollback_last, rollback_max; } NetStats;
+typedef struct { int state; int players; int ping_ms; int delay; int rollback_last, rollback_max; int lobby_ms; } NetStats;
 void net_stats_get(NetStats *out);          /* fills every field; the default: state NET_OFFLINE, ping -1, the rest 0 */
+/* lobby_ms: the round trip to the lobby server (its pong every second), -1 = none yet. It is not the players' ping: their
+ * traffic takes a direct path when one is found (NetPeer below). */
+
+/* The F2 overlay's player list (net_relay.c): the other players the lobby introduced to this game (those of its Local
+ * Wireless room), at most max; never blocks. The default answers 0. */
+enum { NET_PATH_TRYING = 0, NET_PATH_DIRECT = 1, NET_PATH_LOBBY = 2 };
+typedef struct {
+    uint32_t ip;                            /* the player's virtual address */
+    char name[33];                          /* its name in the lobby */
+    int ping_ms;                            /* round trip of the direct path, smoothed (a hello every 400 ms); -1 = no direct path */
+    int path;                               /* NET_PATH_*: still trying to open a direct path, direct, or through the lobby */
+    int in_room;                            /* in this game's Local Wireless room now */
+    int rollback;                           /* a rollback message of its game heard in the last 3 s (its rollback is on) */
+} NetPeer;
+int net_peers_get(NetPeer *out, int max);
 
 /* O1 (plan\phases\O1_room_browser.md): the room browser of the settings menu (F1 > Online rooms), net_relay.c.
  * Every room of this lobby code, any game version or mod set; joinable = same build id as this game, otherwise why
