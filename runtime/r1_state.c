@@ -608,6 +608,25 @@ static void fibers_restore_all(void) {
         }
     }
 }
+/* (Linux pair runs np1h / np8j) a fiber that was RUNNING at the capture (only its registers kept) can be put back only if it
+ * is still there at the same wait (fibers_restore_all's "registers only" case), and one switched away then only if it is not
+ * running now. Otherwise it is "NOT restored": the memory went back while its host stack stayed in a later state, and the job
+ * crashed on that stack when it ran on (2 of 114 runs had such a load; both crashed so, in TaskWorker2). Counted before the
+ * load changes anything (r1_ring.c refuses it). */
+static int fibers_unrestorable(const Fib *fib, int nfib) {
+    g_ncur = 0; g_fib_mode = 1; os_r1_fibers(fib_cb);
+    int bad = 0;
+    for (int i = 0; i < nfib; i++) {
+        const Fib *f = &fib[i];
+        if (!f->c) continue;                                  /* never ran then: started again from the beginning */
+        int j; for (j = 0; j < g_ncur; j++) if (g_cur[j].key == f->key) break;
+        void *cf = j < g_ncur ? g_cur[j].fiber : NULL; Ctx *cc = j < g_ncur ? g_cur[j].c : NULL;
+        int running_now = j < g_ncur && g_cur[j].tid != 0;
+        if (f->susp) { if (running_now) bad++; continue; }
+        if (!(cf == f->fiber && cc == f->c && cc->in_import == f->imp && cc->import_from == f->from && cc->x[31] == f->sp)) bad++;
+    }
+    return bad;
+}
 static int g_busy_depth, g_busy_log = 0, g_wait_idle;
 static struct { uint64_t key, min_depth; } g_fd[2048]; static int g_nfd;
 static void idle_cb(uint64_t key, Ctx *c, uint64_t stack, uint64_t size, void *fiber) {

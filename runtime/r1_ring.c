@@ -60,6 +60,7 @@ static uint8_t *g_rg_pool; static uint32_t g_rg_bump, g_rg_pcom, *g_rg_free, g_r
 static uint8_t *g_rg_cbs; static int *g_rg_ncbs; static int g_rg_cb_ok = -1;
 static double g_rg_park_ms = 30;
 static int g_rg_refuse_run; static long long g_rg_refuse_gaveup;      /* (R3 pub1) refusals of the rollback now pending in a row; loads made anyway after 8 */
+static int g_rg_fiber_refused;                          /* the last load was refused for a job fiber of that state alone (fibers_unrestorable) */
 static int g_rg_keep, g_rg_kept, g_rg_keep_on = -1; static long long g_rg_kept_n, g_rg_kept_same;   /* capture -> load at the same safe point: threads stay held */
 static long long g_rg_caps, g_rg_cap_fail, g_rg_loads, g_rg_overflow;
 static double g_rg_last[2];
@@ -571,6 +572,7 @@ int r1_ring_load(long long frame, Ctx *c) {
     if (si < 0) return 0;
     double t0 = now_ms(); g_rgp_seg = 5;
     RgSlot *g = rg_slot(si);
+    g_rg_fiber_refused = 0;
     int k = g_rg_count - 1 - si;
     static Th cur[256]; int ncur = g_rg_kept ? g_nth : 0;  /* threads still held from the capture just made (g_rg_keep) */
     if (ncur) memcpy(cur, g_th, (size_t)ncur * sizeof *cur);
@@ -604,7 +606,12 @@ int r1_ring_load(long long frame, Ctx *c) {
     {   static int runfix = -1, tn = -1; static long long tc;
         if (runfix < 0) { const char *e = getenv("SSBU_R1_RUNFIX"); runfix = e && e[0] ? atoi(e) : 2; e = getenv("SSBU_RB_NET_TEST_REFUSE"); tn = e ? atoi(e) : 0; }
         int forced = tn > 0 && ++tc % tn == 0;
-        int refuse = (runfix == 1 && g_th_running) || (runfix >= 2 && g_th_mismatch);
+        /* a job fiber still running after the 200 ms above (not at a waiting import), or one that cannot be put back as it was
+         * in that state (fibers_unrestorable), is in the same place as a running thread: the load would change the memory under
+         * it. Refused the same way (they were loaded anyway, logged "fibers still busy" / "fibers not restored") */
+        int fibers_busy = runfix >= 2 && g_ra_busy_fibers, fibers_unrest = runfix >= 2 ? fibers_unrestorable(g->fib, g->nfib) : 0;
+        int refuse = (runfix == 1 && g_th_running) || (runfix >= 2 && g_th_mismatch) || fibers_busy || fibers_unrest;
+        g_rg_fiber_refused = refuse && !forced && !(runfix == 1 && g_th_running) && !(runfix >= 2 && g_th_mismatch) && !fibers_busy;   /* only that: an older state may do (rb_rollback.c) */
         /* the same rollback refused 8 times in a row (4 s): loaded the old way rather than freezing the match (logged) */
         if (refuse && !forced && g_rg_refuse_run >= 8) {
             refuse = 0; g_rg_refuse_gaveup++;
@@ -617,7 +624,7 @@ int r1_ring_load(long long frame, Ctx *c) {
             for (int i = g_ninfo; guest_thread_info(i, &tc2, &nm2, &h2); i++) if (h2 && GetThreadId(h2) != GetCurrentThreadId()) ResumeThread(h2);
             g_rg_refused++;
             if (g_rg_refused <= 20 || g_rg_refused % 100 == 0) LOG("r1: RING load of frame %lld (k %d) REFUSED (%lld so far): %s; every thread goes on, the rollback is tried again next tick\n",
-                frame, k, g_rg_refused, forced ? "test switch SSBU_RB_NET_TEST_REFUSE" : g_th_running ? "a thread still running guest code after 500 ms" : "a thread blocked at another wait than in that state after 500 ms");
+                frame, k, g_rg_refused, forced ? "test switch SSBU_RB_NET_TEST_REFUSE" : g_th_running ? "a thread still running guest code after 500 ms" : g_th_mismatch ? "a thread blocked at another wait than in that state after 500 ms" : fibers_busy ? "a job fiber still running after 200 ms" : "a job fiber that cannot be put back as it was in that state");
             g_rgp_seg = 1;
             return -1;
         }

@@ -76,7 +76,7 @@ static double g_rbg_t_pre, g_rbg_t_load, g_rbg_t_rerun, g_rbg_t_recap, g_rbg_t_p
 static long long g_rbg_short_waits;
 /* (R3 pub1) a load refused at a wrong guess at frame g_rbg_pend (r1_ring_load -1): the state before it must stay in the ring
  * until the rollback is made next tick; g_rbg_refused_tick: no second try in the same tick (each try may hold for 500 ms) */
-static int g_rbg_pend, g_rbg_refused_tick;
+static int g_rbg_pend, g_rbg_refused_tick; static long long g_rbg_older;     /* states tried older than the newest one (a job fiber that cannot be put back) */
 void rbn_put_mismatch(int m);
 static int rbg_capture(long long i, Ctx *c) { g_rg_need = rbn_confirmed(); if (g_rbg_pend > 0 && g_rbg_pend - 1 < g_rg_need) g_rg_need = g_rbg_pend - 1; return r1_ring_capture(i, c); }
 void rbn_stats(int *delay, int *last, int *maxk) { *delay = rbn_delay(); *last = (int)g_rbg_last_k; *maxk = (int)g_rbg_max_k; }   /* net_relay.c net_stats_get (F2) */
@@ -102,6 +102,16 @@ static int rbg_rollback(Ctx *c, long long i, int m) {
     if (!g_ra_wh_on) { g_rbg_rb_unheld++; if (g_rbg_rb_unheld <= 10) LOG("r1: RB NET: rollback at frame %lld while the task workers are NOT held (watchdog releases so far %lld): the load may leave the job system waiting\n", i, g_ra_wd_fired); }
     if (g_rbg_refused_tick) { rbn_put_mismatch(m); return 0; }      /* (R3 pub1) refused once this tick: next tick */
     int lr = r1_ring_load(best, c);
+    /* (Linux pair run ur13: the state of frame 61 refused 8 times for a job fiber that had been running in it and was switched
+     * away since, then loaded anyway: desync) such a state never becomes loadable; up to 3 older ones are tried at once, in
+     * which that fiber may have been switched away (its stack kept), at the price of more frames run again */
+    for (int t = 0; lr < 0 && g_rg_fiber_refused && t < 3; t++) {
+        long long older = -1;
+        for (int s = 0; s < g_rg_count; s++) { long long f = rg_slot(s)->frame; if (f < best && f > older) older = f; }
+        if (older < 0) break;
+        g_rbg_older++; if (g_rbg_older <= 20) LOG("r1: RB NET: the state of frame %lld has a job fiber that cannot be put back: the older state of frame %lld is tried\n", best, older);
+        best = older; lr = r1_ring_load(best, c);
+    }
     if (lr < 0) { g_rbg_refused_tick = 1; g_rbg_pend = m; rbn_put_mismatch(m); return 0; }      /* (R3 pub1) refused (a thread running): the wrong guess stays pending */
     if (!lr) { g_rbg_miss++; return 0; }
     g_rbg_pend = 0;
