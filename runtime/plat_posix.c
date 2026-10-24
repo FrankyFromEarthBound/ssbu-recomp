@@ -371,10 +371,16 @@ static void ctx_to_uc(ucontext_t *u, const CONTEXT *c) {
     g[REG_RSI] = c->Rsi; g[REG_RDI] = c->Rdi; g[REG_R8] = c->R8; g[REG_R9] = c->R9; g[REG_R10] = c->R10; g[REG_R11] = c->R11;
     g[REG_R12] = c->R12; g[REG_R13] = c->R13; g[REG_R14] = c->R14; g[REG_R15] = c->R15; g[REG_RIP] = c->Rip; g[REG_EFL] = c->EFlags;
 }
+/* A thread is never held while it holds g_vm_lock (VirtualAlloc / VirtualProtect / VirtualQuery): the holder's next
+ * VirtualQuery waited for it for good (a TaskWorker held inside VirtualAlloc's mprotect, which looks like a blocked call,
+ * and th_blocked's VirtualQuery for the next thread: a human Local Wireless room, 2026-10-23). A suspend that comes while
+ * the lock is held is kept and taken by vm_unlock, a few microseconds later. */
+static __thread volatile sig_atomic_t t_vm_locked, t_sus_pending;
 static void sus_signal(int sig, siginfo_t *si, void *uc) {
     (void)sig; (void)si;
     PlatObj *o = t_self;
     if (!o) return;
+    if (t_vm_locked) { t_sus_pending = 1; return; }
     int e = errno;
     uint32_t g = __atomic_load_n(&o->sus_gen, __ATOMIC_ACQUIRE);
     ctx_from_uc(&o->sus_ctx, uc);
@@ -853,6 +859,17 @@ typedef struct { uintptr_t lo, hi, alloc_base; DWORD state, prot, alloc_prot; } 
 static Seg *g_seg;
 static int g_nseg, g_capseg;
 static pthread_mutex_t g_vm_lock = PTHREAD_MUTEX_INITIALIZER;
+#if defined(__linux__) && defined(__x86_64__)
+static void vm_lock(void) { t_vm_locked = 1; __atomic_signal_fence(__ATOMIC_SEQ_CST); pthread_mutex_lock(&g_vm_lock); }
+static void vm_unlock(void) {
+    pthread_mutex_unlock(&g_vm_lock);
+    __atomic_signal_fence(__ATOMIC_SEQ_CST); t_vm_locked = 0; __atomic_signal_fence(__ATOMIC_SEQ_CST);
+    if (t_sus_pending) { t_sus_pending = 0; pthread_kill(pthread_self(), SIG_SUSPEND); }      /* the suspend kept while locked */
+}
+#else
+static void vm_lock(void) { pthread_mutex_lock(&g_vm_lock); }
+static void vm_unlock(void) { pthread_mutex_unlock(&g_vm_lock); }
+#endif
 #define PAGE 4096u
 static int prot_posix(DWORD p) {
     switch (p & 0xff) {
@@ -950,10 +967,10 @@ static int ww_find(uintptr_t a) { for (int i = 0; i < g_nww; i++) if (a >= g_ww[
 static void ww_drop(uintptr_t lo) { int i = ww_find(lo); if (i >= 0) g_ww[i] = g_ww[--g_nww]; }      /* munmap unregisters by itself */
 UINT GetWriteWatch(DWORD flags, PVOID base, SIZE_T size, PVOID *addrs, ULONG_PTR *count, ULONG *gran) {
     uintptr_t lo = (uintptr_t)base & ~(uintptr_t)(PAGE - 1), hi = ((uintptr_t)base + size + PAGE - 1) & ~(uintptr_t)(PAGE - 1);
-    pthread_mutex_lock(&g_vm_lock);
+    vm_lock();
     int i = ww_find(lo);
     int ok = i >= 0 && hi <= g_ww[i].hi;
-    pthread_mutex_unlock(&g_vm_lock);
+    vm_unlock();
     if (!ok || !size) { t_lasterr = ERROR_INVALID_PARAMETER; return 1; }
     struct page_region v[256];
     ULONG_PTR max = *count, got = 0;
@@ -977,9 +994,9 @@ UINT GetWriteWatch(DWORD flags, PVOID base, SIZE_T size, PVOID *addrs, ULONG_PTR
 }
 UINT ResetWriteWatch(LPVOID base, SIZE_T size) {
     uintptr_t lo = (uintptr_t)base & ~(uintptr_t)(PAGE - 1), hi = ((uintptr_t)base + size + PAGE - 1) & ~(uintptr_t)(PAGE - 1);
-    pthread_mutex_lock(&g_vm_lock);
+    vm_lock();
     int i = ww_find(lo);
-    pthread_mutex_unlock(&g_vm_lock);
+    vm_unlock();
     if (i < 0) return 1;
     ww_protect(lo, hi - lo);
     return 0;
@@ -1097,25 +1114,25 @@ static void ww_protect(uintptr_t lo, size_t n) {          /* decommitted pieces:
 }
 UINT GetWriteWatch(DWORD flags, PVOID base, SIZE_T size, PVOID *addrs, ULONG_PTR *count, ULONG *gran) {
     uintptr_t lo = (uintptr_t)base & ~(uintptr_t)(PAGE - 1), hi = ((uintptr_t)base + size + PAGE - 1) & ~(uintptr_t)(PAGE - 1);
-    pthread_mutex_lock(&g_vm_lock);
+    vm_lock();
     int i = ww_find(lo);
-    if (i < 0 || hi > g_ww[i].hi || !size) { pthread_mutex_unlock(&g_vm_lock); t_lasterr = ERROR_INVALID_PARAMETER; return 1; }
+    if (i < 0 || hi > g_ww[i].hi || !size) { vm_unlock(); t_lasterr = ERROR_INVALID_PARAMETER; return 1; }
     ULONG_PTR max = *count, got = 0;
     uintptr_t H = g_hpage, p = lo;
     for (; p < hi && got < max; p += PAGE)
         if (__atomic_load_n(&g_ww[i].dirty[(p - g_ww[i].lo) / H], __ATOMIC_ACQUIRE) & (1u << ((p & (H - 1)) / PAGE))) addrs[got++] = (PVOID)p;
     if (flags & WRITE_WATCH_FLAG_RESET) ww_reset(i, lo, p, 1);           /* the pieces looked at */
-    pthread_mutex_unlock(&g_vm_lock);
+    vm_unlock();
     if (gran) *gran = PAGE;
     *count = got;
     return 0;
 }
 UINT ResetWriteWatch(LPVOID base, SIZE_T size) {
     uintptr_t lo = (uintptr_t)base & ~(uintptr_t)(PAGE - 1), hi = ((uintptr_t)base + size + PAGE - 1) & ~(uintptr_t)(PAGE - 1);
-    pthread_mutex_lock(&g_vm_lock);
+    vm_lock();
     int i = ww_find(lo);
     if (i >= 0) ww_reset(i, lo, hi < g_ww[i].hi ? hi : g_ww[i].hi, 1);
-    pthread_mutex_unlock(&g_vm_lock);
+    vm_unlock();
     return i < 0;
 }
 #endif
@@ -1124,7 +1141,7 @@ UINT ResetWriteWatch(LPVOID base, SIZE_T size) {
 LPVOID VirtualAlloc(LPVOID addr, SIZE_T size, DWORD type, DWORD prot) {
     if (!size) { t_lasterr = ERROR_INVALID_PARAMETER; return NULL; }
     uintptr_t a = (uintptr_t)addr;
-    pthread_mutex_lock(&g_vm_lock);
+    vm_lock();
     if (type & MEM_RESERVE || !addr) {
         uintptr_t lo = a & ~(uintptr_t)0xffff;          /* reservations start on 64 KB, as on Windows */
         size_t n = (size + (a - lo) + PAGE - 1) & ~(size_t)(PAGE - 1);
@@ -1151,7 +1168,7 @@ LPVOID VirtualAlloc(LPVOID addr, SIZE_T size, DWORD type, DWORD prot) {
         }
         if (p == MAP_FAILED || (addr && (uintptr_t)p != lo)) {
             if (p != MAP_FAILED) munmap(p, nm);
-            pthread_mutex_unlock(&g_vm_lock);
+            vm_unlock();
             t_lasterr = ERROR_INVALID_ADDRESS;
             return NULL;
         }
@@ -1159,30 +1176,30 @@ LPVOID VirtualAlloc(LPVOID addr, SIZE_T size, DWORD type, DWORD prot) {
         seg_set(lo, lo + n, lo, commit ? MEM_COMMIT : MEM_RESERVE, commit ? prot : 0, prot);
         if (type & MEM_WRITE_WATCH) ww_add(lo, n);
         if (commit) vm_sync(lo, lo + n);
-        pthread_mutex_unlock(&g_vm_lock);
+        vm_unlock();
         return addr ? (void *)a : p;
     }
     /* commit inside a reservation */
     uintptr_t lo = a & ~(uintptr_t)(PAGE - 1), hi = (a + size + PAGE - 1) & ~(uintptr_t)(PAGE - 1);
     int i = seg_find(lo);
-    if (i >= g_nseg || g_seg[i].lo > lo) { pthread_mutex_unlock(&g_vm_lock); t_lasterr = ERROR_INVALID_ADDRESS; return NULL; }
+    if (i >= g_nseg || g_seg[i].lo > lo) { vm_unlock(); t_lasterr = ERROR_INVALID_ADDRESS; return NULL; }
     uintptr_t base = g_seg[i].alloc_base; DWORD aprot = g_seg[i].alloc_prot;
     for (uintptr_t p = lo; p < hi;) {                  /* the whole range must be reserved */
         int k = seg_find(p);
-        if (k >= g_nseg || g_seg[k].lo > p) { pthread_mutex_unlock(&g_vm_lock); t_lasterr = ERROR_INVALID_ADDRESS; return NULL; }
+        if (k >= g_nseg || g_seg[k].lo > p) { vm_unlock(); t_lasterr = ERROR_INVALID_ADDRESS; return NULL; }
         p = g_seg[k].hi;
     }
-    if (vm_mprotect(lo, hi, prot)) { pthread_mutex_unlock(&g_vm_lock); fail_errno(); return NULL; }
+    if (vm_mprotect(lo, hi, prot)) { vm_unlock(); fail_errno(); return NULL; }
     seg_set(lo, hi, base, MEM_COMMIT, prot, aprot);
     vm_sync(lo, hi);
-    pthread_mutex_unlock(&g_vm_lock);
+    vm_unlock();
     return addr;
 }
 BOOL VirtualFree(LPVOID addr, SIZE_T size, DWORD type) {
     uintptr_t a = (uintptr_t)addr;
-    pthread_mutex_lock(&g_vm_lock);
+    vm_lock();
     int i = seg_find(a);
-    if (i >= g_nseg || g_seg[i].lo > a) { pthread_mutex_unlock(&g_vm_lock); t_lasterr = ERROR_INVALID_ADDRESS; return FALSE; }
+    if (i >= g_nseg || g_seg[i].lo > a) { vm_unlock(); t_lasterr = ERROR_INVALID_ADDRESS; return FALSE; }
     if (type & MEM_RELEASE) {
         uintptr_t base = g_seg[i].alloc_base, hi = base;
         int k = seg_find(base);
@@ -1216,7 +1233,7 @@ BOOL VirtualFree(LPVOID addr, SIZE_T size, DWORD type) {
         seg_set(lo, hi, base, MEM_RESERVE, 0, aprot);
         vm_sync(lo, hi);
     }
-    pthread_mutex_unlock(&g_vm_lock);
+    vm_unlock();
     return TRUE;
 }
 BOOL VirtualProtect(LPVOID addr, SIZE_T size, DWORD prot, DWORD *old) {
@@ -1226,15 +1243,15 @@ BOOL VirtualProtect(LPVOID addr, SIZE_T size, DWORD prot, DWORD *old) {
      * entry) take the execute right away from a code page. */
     MEMORY_BASIC_INFORMATION mi;
     DWORD untracked_old = VirtualQuery((void *)lo, &mi, sizeof mi) && mi.State == MEM_COMMIT ? mi.Protect : PAGE_READWRITE;
-    pthread_mutex_lock(&g_vm_lock);
+    vm_lock();
     int i = seg_find(lo);
     int tracked = i < g_nseg && g_seg[i].lo <= lo;
     if (old) *old = tracked ? g_seg[i].prot : untracked_old;
 #ifdef __APPLE__                                  /* memory we did not map: whole host pages (vm_sync does ours) */
     uintptr_t hlo = lo & ~(hpage() - 1), hhi = (hi + hpage() - 1) & ~(hpage() - 1);
-    if (!tracked && mprotect((void *)hlo, hhi - hlo, prot_posix(prot))) { pthread_mutex_unlock(&g_vm_lock); return fail_errno(); }
+    if (!tracked && mprotect((void *)hlo, hhi - hlo, prot_posix(prot))) { vm_unlock(); return fail_errno(); }
 #endif
-    if (vm_mprotect(lo, hi, prot)) { pthread_mutex_unlock(&g_vm_lock); return fail_errno(); }
+    if (vm_mprotect(lo, hi, prot)) { vm_unlock(); return fail_errno(); }
     if (tracked) {                                   /* per segment: keeps each one's allocation base */
         for (uintptr_t p = lo; p < hi;) {
             int k = seg_find(p);
@@ -1245,7 +1262,7 @@ BOOL VirtualProtect(LPVOID addr, SIZE_T size, DWORD prot, DWORD *old) {
         }
         vm_sync(lo, hi);
     }
-    pthread_mutex_unlock(&g_vm_lock);
+    vm_unlock();
     return TRUE;
 }
 static DWORD prot_from_maps(const char *perm) {
@@ -1260,19 +1277,19 @@ SIZE_T VirtualQuery(LPCVOID addr, MEMORY_BASIC_INFORMATION *mi, SIZE_T len) {
     uintptr_t a = (uintptr_t)addr & ~(uintptr_t)(PAGE - 1);
     memset(mi, 0, sizeof *mi);
     mi->BaseAddress = (void *)a;
-    pthread_mutex_lock(&g_vm_lock);
+    vm_lock();
     int i = seg_find(a);
     if (i < g_nseg && g_seg[i].lo <= a) {
         Seg s = g_seg[i];
         uintptr_t hi = s.hi;
         for (int k = i + 1; k < g_nseg && g_seg[k].lo == hi && g_seg[k].alloc_base == s.alloc_base && g_seg[k].state == s.state && g_seg[k].prot == s.prot; k++) hi = g_seg[k].hi;
-        pthread_mutex_unlock(&g_vm_lock);
+        vm_unlock();
         mi->AllocationBase = (void *)s.alloc_base; mi->AllocationProtect = s.alloc_prot;
         mi->RegionSize = hi - a; mi->State = s.state; mi->Protect = s.state == MEM_COMMIT ? s.prot : 0; mi->Type = MEM_PRIVATE;
         return sizeof *mi;
     }
     uintptr_t next_tracked = i < g_nseg ? g_seg[i].lo : UINTPTR_MAX;
-    pthread_mutex_unlock(&g_vm_lock);
+    vm_unlock();
     if (a >= 0x800000000000ULL) return 0;
 #ifdef PROCMAP_QUERY
     /* Linux 6.11+: the mapping that holds a (or the next one) asked of the kernel directly. Reading and parsing the text
