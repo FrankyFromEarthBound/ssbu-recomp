@@ -1546,7 +1546,7 @@ int mx_translate(const MxIn *in, MxOut *out) {
         if (in->stage == MX_VERTEX) e->out_attr |= in->force_out;      /* declared and set to (0, 0, 0, 1) below */
         const int vk = in->target == 1;
         const char *set0 = vk ? "set = 0, " : "", *set1 = vk ? "set = 1, " : "";
-        if (vk) emit(&h, "#version 460\n#extension GL_ARB_gpu_shader_int64 : enable\n#extension GL_EXT_texture_shadow_lod : enable\n");
+        if (vk) emit(&h, "#version 460\n#extension GL_ARB_gpu_shader_int64 : enable\n#extension GL_EXT_texture_shadow_lod : enable\n%s", in->cb_ubo ? "#extension GL_EXT_scalar_block_layout : require\n" : "");
         else
         emit(&h, "#version 460 compatibility\n#extension GL_ARB_bindless_texture : require\n#extension GL_NV_gpu_shader5 : enable\n#extension GL_ARB_gpu_shader_int64 : enable\n"
                  "#extension GL_ARB_shader_ballot : enable\n#extension GL_ARB_shader_group_vote : enable\n#extension GL_EXT_texture_shadow_lod : enable\n");
@@ -1563,7 +1563,10 @@ int mx_translate(const MxIn *in, MxOut *out) {
             emit(&h, "float mx_psize;\nvec4 mx_position;\n");
         }
         for (int k = 0; vk && k < e->nsmp; k++) emit(&h, "layout(set = 1, binding = %u) uniform %s mx_t%u_%s;\n", (unsigned)e->smp[k].binding, e->smp[k].type, (unsigned)e->smp[k].unit, e->smp[k].type);
-        for (unsigned n = 0; n < 18; n++) if (e->cbufs >> n & 1) emit(&h, "layout(std430, %sbinding = %u) readonly buffer CB%u { uint c%u[]; };\n", set0, in->binding_base + n, n, n);
+        for (unsigned n = 0; n < 18; n++) if (e->cbufs >> n & 1) {
+            if (vk && in->cb_ubo) emit(&h, "layout(scalar, %sbinding = %u) uniform CB%u { uint c%u[16384]; };\n", set0, in->binding_base + n, n, n);
+            else emit(&h, "layout(std430, %sbinding = %u) readonly buffer CB%u { uint c%u[]; };\n", set0, in->binding_base + n, n, n);
+        }
         if (in->stage == MX_VERTEX) {
             int nclip = 0;
             for (int k = 0; k < 8; k++) if (e->clip_out >> k & 1) nclip = k + 1;

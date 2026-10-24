@@ -90,6 +90,13 @@ static int vk_gpl_mode(void) {
 }
 
 /* ---------------------------------------------------------------- device features */
+/* 2026-10-24: the constant buffers of the vertex and fragment stages are uniform buffers (MxIn.cb_ubo, scalar layout) instead
+ * of storage buffers when the device has scalarBlockLayout and room for 17 uniform buffers per stage: on Intel the reads at
+ * constant offsets are pushed into registers (a storage buffer read goes through memory). The stages are another translation
+ * (ssrc_hb), prepared once. Compute keeps storage buffers. SSBU_VK_UBO=0: storage buffers (as before). */
+static int g_cb_ubo = -1;
+static int cb_ubo(void) { if (g_cb_ubo < 0) g_cb_ubo = !(getenv("SSBU_VK_UBO") && !atoi(getenv("SSBU_VK_UBO"))); return g_cb_ubo; }
+#define CB_DESC (cb_ubo() ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
 static void vkd_device_info(VkDeviceCreateInfo *di, const VkExtensionProperties *dext, uint32_t ndext) {
     void **tail;
     vkGetPhysicalDeviceFeatures2 = vk_sym("vkGetPhysicalDeviceFeatures2");
@@ -155,6 +162,9 @@ static void vkd_device_info(VkDeviceCreateInfo *di, const VkExtensionProperties 
                (int)D.port.imageView2DOn3DImage, (int)D.port.vertexAttributeAccessBeyondStride);
 #endif
     if (!D.f13.dynamicRendering || !D.f13.synchronization2) vkd_fail("the device lacks dynamicRendering / synchronization2");
+    if (cb_ubo() && (!D.f12.scalarBlockLayout || V.props.limits.maxPerStageDescriptorUniformBuffers < 17 || V.props.limits.maxDescriptorSetUniformBuffers < 34 || V.props.limits.maxUniformBufferRange < 65536)) g_cb_ubo = 0;
+    printf("nvn_vk: constant buffers of the vertex and fragment stages: %s (scalar block layout %d, uniform buffers per stage %u, per set %u, range %u)\n", cb_ubo() ? "uniform buffers" : "storage buffers",
+           (int)D.f12.scalarBlockLayout, V.props.limits.maxPerStageDescriptorUniformBuffers, V.props.limits.maxDescriptorSetUniformBuffers, V.props.limits.maxUniformBufferRange);
     /* MAC2 / V_novids (2026-10-21): every platform now draws without the extension (an RX 550 / Polaris on AMD's Windows
      * driver lacks it): the vertex layout is part of the pipeline (nvk_vi_pipe), the strides stay dynamic */
     if (!D.has_vids) printf("nvn_vk: no VK_EXT_vertex_input_dynamic_state: the vertex layout is part of the pipeline key, strides dynamic; instance divisors above 1: %s; "
@@ -1331,7 +1341,7 @@ static VStage *vstage_get(Prog *p, int s, const uint32_t *key, uint32_t fo) {
     memset(&in, 0, sizeof in); memset(&out, 0, sizeof out);
     in.stage = s; in.code = st->code; in.code_len = st->code_len; in.cdata = cdata; in.cdata_size = cdata ? st->ctl[3] : 0;
     in.int_attrs = key[0]; in.sint_attrs = key[1]; in.int_tex = key[2]; in.sint_tex = key[3]; in.force_out = fo;
-    in.target = 1; in.binding_base = 40u * (unsigned)s; in.ssbo_base = 40u * (unsigned)s + 20; in.tex_base = 40u * (unsigned)s; in.image_base = 40u * (unsigned)s + 32; in.wmask_binding = 40u * (unsigned)s + 38;
+    in.target = 1; in.cb_ubo = s <= 1 && cb_ubo(); in.binding_base = 40u * (unsigned)s; in.ssbo_base = 40u * (unsigned)s + 20; in.tex_base = 40u * (unsigned)s; in.image_base = 40u * (unsigned)s + 32; in.wmask_binding = 40u * (unsigned)s + 38;
     if (s == 5) {                                  /* compute has a layout of its own (design, section 4): the bindings of stage 0 */
         in.binding_base = 0; in.ssbo_base = 20; in.tex_base = 0; in.image_base = 32; in.wmask_binding = 38; in.track_writes = 1;
         memcpy(in.local_size, st->local, sizeof in.local_size); in.smem_bytes = st->smem_bytes; in.lmem_bytes = st->lmem_bytes;
@@ -1388,7 +1398,7 @@ static VkBlendFactor blend_factor(unsigned f) {
 static VkBlendOp blend_op(unsigned e) { static const uint8_t m[6] = {VK_BLEND_OP_ADD, VK_BLEND_OP_ADD, VK_BLEND_OP_SUBTRACT, VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_MIN, VK_BLEND_OP_MAX}; return (VkBlendOp)m[e < 6 ? e : 1]; }
 static void layout_bindings(VStage *v, int s, VkDescriptorSetLayoutBinding *b0, int *n0, VkDescriptorSetLayoutBinding *b1, int *n1) {
     VkFlags sf = s ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_VERTEX_BIT;
-    for (unsigned n = 1; n < 18; n++) if (v->cbufs >> n & 1) { VkDescriptorSetLayoutBinding b = {40u * (unsigned)s + n, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, sf, NULL}; b0[(*n0)++] = b; }
+    for (unsigned n = 1; n < 18; n++) if (v->cbufs >> n & 1) { VkDescriptorSetLayoutBinding b = {40u * (unsigned)s + n, CB_DESC, 1, sf, NULL}; b0[(*n0)++] = b; }
     for (unsigned k = 0; k < 16; k++) if (v->ssbos >> k & 1) { VkDescriptorSetLayoutBinding b = {40u * (unsigned)s + 20 + k, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, sf, NULL}; b0[(*n0)++] = b; }
     for (int i = 0; i < v->nsmp; i++) { VkDescriptorSetLayoutBinding b = {v->smp[i].binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, sf, NULL}; b1[(*n1)++] = b; }
 }
@@ -1520,6 +1530,13 @@ static int target_same(const TargetRef *a, const TargetRef *b) {      /* the sam
     int fa = (a->view.set & 0x84) == 0x84 && a->view.format ? a->view.format : (int)a->tex->b.format, fb = (b->view.set & 0x84) == 0x84 && b->view.format ? b->view.format : (int)b->tex->b.format;
     return target_level(a) == target_level(b) && ea.lay0 == eb.lay0 && fa == fb;
 }
+static void pass_settle(void) {      /* the pass whose targets were set again: it goes on when they are its own, else it ends (before a draw looks at its textures: feedback) */
+    if (!R.in_pass || !R.pass_stale) return;
+    int same = R.ncol == R.pncol && target_same(&R.depth, &R.pdepth);
+    for (int i = 0; i < 8 && same; i++) same = target_same(&R.col[i], &R.pcol[i]);
+    if (same) { R.pass_stale = 0; g_same_targets_n++; }
+    else pass_end();
+}
 static void pass_stale_end(void) {      /* the pass whose targets were set again has ended: what OP_TARGETS did to the targets it replaced */
     for (int i = 0; i < R.pncol; i++) if (R.pcol[i].tex && R.pcol[i].tex->vk) ((VTex *)R.pcol[i].tex->vk)->feedback = 0;
     if (R.pdepth.tex && R.pdepth.tex->vk) ((VTex *)R.pdepth.tex->vk)->feedback = 0;
@@ -1529,13 +1546,8 @@ static int pass_begin(void) {
     VkRenderingAttachmentInfo ca[8], da, sa;
     VkRenderingInfo ri = {VK_STRUCTURE_TYPE_RENDERING_INFO};
     int w = 0, h = 0;
-    if (R.in_pass) {
-        if (!R.pass_stale) return 1;
-        int same = R.ncol == R.pncol && target_same(&R.depth, &R.pdepth);
-        for (int i = 0; i < 8 && same; i++) same = target_same(&R.col[i], &R.pcol[i]);
-        if (same) { R.pass_stale = 0; g_same_targets_n++; return 1; }
-        pass_end();
-    }
+    pass_settle();
+    if (R.in_pass) return 1;
     if (g_split < 0) { const char *e = getenv("SSBU_VK_SPLIT"); g_split = e ? atoi(e) : VK_SPLIT_DEFAULT; }
     if (g_split > 0 && R.recording && g_cmd_draws >= g_split) { cmd_submit(NULL, NULL); g_splits++; }      /* round 16: the GPU starts on what is recorded so far (a pass has just ended: nothing is cut in two) */
     cmd_begin();
@@ -1637,9 +1649,9 @@ static VkDescriptorSet set_alloc(VkDescriptorSetLayout layout) {
             continue;
         }
         if (s->npool == 16) vkd_fail("more than 16 descriptor pools in one command buffer");
-        VkDescriptorPoolSize ps[2] = {{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 32768}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32768}};
+        VkDescriptorPoolSize ps[3] = {{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 32768}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32768}, {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 32768}};
         VkDescriptorPoolCreateInfo pi = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-        pi.maxSets = 8192; pi.poolSizeCount = 2; pi.pPoolSizes = ps;
+        pi.maxSets = 8192; pi.poolSizeCount = cb_ubo() ? 3 : 2; pi.pPoolSizes = ps;
         VKC(vkCreateDescriptorPool(V.device, &pi, NULL, &s->pool[s->npool++]));
     }
 }
@@ -2455,7 +2467,7 @@ static CB *cb_new(uint64_t addr, uint64_t size) {
         VkBufferCreateInfo bi = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
         VkMemoryRequirements rq;
         c->cap = (size + 4095) & ~(uint64_t)4095;
-        bi.size = c->cap; bi.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT; bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        bi.size = c->cap; bi.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT; bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         VKC(vkCreateBuffer(V.device, &bi, NULL, &c->buf));
         vkGetBufferMemoryRequirements(V.device, c->buf, &rq);
         VkFlags want = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | (g_cb_cached ? VK_MEMORY_PROPERTY_HOST_CACHED_BIT : 0);
@@ -2779,6 +2791,7 @@ static int draw_prepare(unsigned prim) {
     if (D.has_ckpt) { g_dvs = vs; g_dfs = fs; }    /* PR #32: for the device loss report's draw markers */
 
     /* 1. textures (may upload, change layouts, end the pass) */
+    pass_settle();
     g_ndtex = 0;
     for (int i = 0; i < vs->nsmp; i++) resolve_sampler(0, vs, i);
     if (fs) for (int i = 0; i < fs->nsmp; i++) resolve_sampler(1, fs, i);
@@ -2786,6 +2799,7 @@ static int draw_prepare(unsigned prim) {
     static BufRef bufs[80];
     int nbuf = 0;
     uint64_t sal = V.props.limits.minStorageBufferOffsetAlignment ? V.props.limits.minStorageBufferOffsetAlignment : 1;
+    uint64_t cal = cb_ubo() && V.props.limits.minUniformBufferOffsetAlignment > sal ? V.props.limits.minUniformBufferOffsetAlignment : sal;
     for (int s = 0; s < (fs ? 2 : 1); s++) {
         VStage *v = s ? fs : vs;
         Stage *st = &R.prog[s]->st[s];
@@ -2795,7 +2809,7 @@ static int draw_prepare(unsigned prim) {
             b->zero = 0; b->buf = R.ring;
             if (n == 2) { b->off = ring_raw(R.c2[s], sizeof R.c2[s]); b->size = sizeof R.c2[s]; }
             else if (n == 1 && st->ctl[3] && st->ctl[4]) { b->size = st->ctl[3]; b->off = ring_put((uint64_t)(uintptr_t)(st->code - 0x30 + st->ctl[4]), b->size); }
-            else if (n >= 3 && R.ubo[s][n - 3].addr && R.ubo[s][n - 3].size) buf_ref(R.ubo[s][n - 3].addr, R.ubo[s][n - 3].size, sal, b);
+            else if (n >= 3 && R.ubo[s][n - 3].addr && R.ubo[s][n - 3].size) buf_ref(R.ubo[s][n - 3].addr, R.ubo[s][n - 3].size, cal, b);
             else b->zero = 1;
         }
         for (unsigned k = 0; k < 16; k++) {
@@ -2908,8 +2922,9 @@ static int draw_prepare(unsigned prim) {
                 if (!bit) continue;
                 BufRef *b = &bufs[ib];
                 bi[ib].buffer = b->zero ? R.zero : b->buf; bi[ib].offset = b->zero ? 0 : b->off; bi[ib].range = b->zero ? 65536 : b->size;
+                if (n < 18 && bi[ib].range > 65536) bi[ib].range = 65536;      /* the most a constant buffer holds (a uniform buffer's range: maxUniformBufferRange >= 65536, cb_ubo) */
                 w[nw].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET; w[nw].dstSet = sets[0]; w[nw].dstBinding = 40u * (unsigned)s + (n < 18 ? n : 20 + n - 18); w[nw].descriptorCount = 1;
-                w[nw].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; w[nw].pBufferInfo = &bi[ib]; nw++; ib++;
+                w[nw].descriptorType = n < 18 ? CB_DESC : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; w[nw].pBufferInfo = &bi[ib]; nw++; ib++;
             }
         }
         if (p->push0) { if (nw) vkCmdPushDescriptorSetKHR(R.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, p->layout, 0, (uint32_t)nw, w); }
@@ -4380,8 +4395,8 @@ static void vkd_init(void) {
         VKC(vkCreateFence(V.device, &fi, NULL, &R.slot[i].fence));
     }
     R.ring_size = 256ull << 20;
-    R.ring = vbuf_new(R.ring_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, &R.ring_mem);      /* TRANSFER_DST: cb_assemble */
-    R.zero = vbuf_new(65536 + 64, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &R.zero_mem);
+    R.ring = vbuf_new(R.ring_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, &R.ring_mem);      /* TRANSFER_DST: cb_assemble */
+    R.zero = vbuf_new(65536 + 64, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &R.zero_mem);
     memset(R.zero_mem.map, 0, 65536 + 64);
     { float f1 = 1.0f; uint32_t i1 = 1; memcpy((uint8_t *)R.zero_mem.map + 65536 + 12, &f1, 4); memcpy((uint8_t *)R.zero_mem.map + 65536 + 28, &i1, 4); }
     R.gen = 1; R.point_size = 1.0f; R.line_width = 1.0f; R.drange[1] = 1.0f; R.sample_mask = 0xffffffffu; R.chanmask = 0xffffffffu; R.logic = 3; R.poly[2] = 2; R.poly[1] = 1;

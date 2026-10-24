@@ -28,6 +28,7 @@ typedef struct VStage {
 typedef struct { uint32_t magic; int32_t stage, code_len; uint32_t key[4], fo; uint64_t spv, hb; uint32_t cbufs, ssbos, ssbo_w, images, dep, tex_units, in_attr, out_attr; int32_t uses_alpha, nsmp; VSmp smp[64]; } StageRec;
 typedef struct { uint32_t magic, key[4], fo, dep, tex; uint64_t vh; } VarRec;      /* ..\cache\vk\stage\<stage>_<hb>.var: the variants of one code */
 #define STAGEREC_MAGIC (0x52545356u + MX_VK_VERSION)
+static uint32_t stagerec_magic(int s) { return STAGEREC_MAGIC + (s <= 1 && cb_ubo() ? 0x10000u : 0u); }      /* a record of a vertex / fragment stage translated with uniform blocks (cb_ubo) is not one with storage buffers: the pipeline history of an older run names those */
 typedef struct { int stage, code_len, serial; const uint8_t *code, *cdata; uint32_t cdata_size, local[3], smem, lmem; } SSrc;
 static CRITICAL_SECTION g_sh_lock;
 static CONDITION_VARIABLE g_sh_cv, g_jq_cv;        /* g_sh_cv: something was finished; g_jq_cv: a job was queued */
@@ -116,7 +117,8 @@ static uint64_t ssrc_hb(const SSrc *o) {
     uint64_t h = fnv(0xcbf29ce484222325ULL ^ (uint64_t)o->stage, o->code, (size_t)o->code_len);
     if (o->stage == 5) { h = fnv(h, o->local, sizeof o->local); h = fnv(h, &o->smem, 4); h = fnv(h, &o->lmem, 4); }
     if (o->cdata) h = fnv(h ^ o->cdata_size, o->cdata, o->cdata_size);
-    if (o->stage == 1 && RS_ON) h = fnv(h, "rs1", 3);      /* track O: the fragment stages of a run with an internal resolution scale are another translation (MxIn.screen_scale); at 1.0 the hash is the one it always was */
+    if (o->stage == 1 && RS_ON) h = fnv(h, "rs1", 3);
+    if (o->stage <= 1 && cb_ubo()) h = fnv(h, "ubo1", 4);      /* 2026-10-24: constant buffers as uniform blocks (MxIn.cb_ubo): another translation; with SSBU_VK_UBO=0 the hash it always was */      /* track O: the fragment stages of a run with an internal resolution scale are another translation (MxIn.screen_scale); at 1.0 the hash is the one it always was */
     return fnv(h, &ver, 4);
 }
 static VkShaderModule module_from_spv(uint64_t h) {              /* any thread; NULL when the file is not there */
@@ -169,7 +171,7 @@ static int stage_rec_read(int s, uint64_t vh, StageRec *r) {
     size_t got = fread(r, 1, sizeof *r, fp);
     fclose(fp);
     if (g_pw_profile) { g_pw_profile->record_ticks += tk() - pt; g_pw_profile->records++; }
-    return got == sizeof *r && r->magic == STAGEREC_MAGIC && r->stage == s && r->nsmp >= 0 && r->nsmp <= 64;
+    return got == sizeof *r && r->magic == stagerec_magic(s) && r->stage == s && r->nsmp >= 0 && r->nsmp <= 64;
 }
 static void vstage_from_rec(VStage *v, const StageRec *r, uint64_t vh, VkShaderModule mod) {
     v->h = vh; v->hb = r->hb; v->code_len = r->code_len; memcpy(v->key, r->key, 16); v->fo = r->fo;
@@ -210,7 +212,7 @@ static void vstage_build(VStage *v, const SSrc *src) {
         VarRec e;
         while (!done && fread(&e, 1, sizeof e, fp) == sizeof e) {
             VkShaderModule mod;
-            if (e.magic != STAGEREC_MAGIC || e.fo != v->fo || !key_fits(s, v->key, e.key, e.dep, e.tex)) continue;
+            if (e.magic != stagerec_magic(s) || e.fo != v->fo || !key_fits(s, v->key, e.key, e.dep, e.tex)) continue;
             if (stage_rec_read(s, e.vh, &r) && (mod = module_from_spv(r.spv)) != NULL) { vstage_from_rec(v, &r, e.vh, mod); v->from_rec = 1; InterlockedIncrement64(&R.modules); done = 1; }
         }
         fclose(fp);
@@ -222,7 +224,7 @@ static void vstage_build(VStage *v, const SSrc *src) {
         memset(&in, 0, sizeof in); memset(&out, 0, sizeof out);
         in.stage = s; in.code = src->code; in.code_len = src->code_len; in.cdata = src->cdata; in.cdata_size = src->cdata ? src->cdata_size : 0;
         in.int_attrs = v->key[0]; in.sint_attrs = v->key[1]; in.int_tex = v->key[2]; in.sint_tex = v->key[3]; in.force_out = v->fo;
-        in.target = 1; in.binding_base = 40u * (unsigned)s; in.ssbo_base = 40u * (unsigned)s + 20; in.tex_base = 40u * (unsigned)s; in.image_base = 40u * (unsigned)s + 32; in.wmask_binding = 40u * (unsigned)s + 38;
+        in.target = 1; in.cb_ubo = s <= 1 && cb_ubo(); in.binding_base = 40u * (unsigned)s; in.ssbo_base = 40u * (unsigned)s + 20; in.tex_base = 40u * (unsigned)s; in.image_base = 40u * (unsigned)s + 32; in.wmask_binding = 40u * (unsigned)s + 38;
         if (s == 5) {                              /* compute has a layout of its own (design, section 4): the bindings of stage 0 */
             in.binding_base = 0; in.ssbo_base = 20; in.tex_base = 0; in.image_base = 32; in.wmask_binding = 38; in.track_writes = 1;
             memcpy(in.local_size, src->local, sizeof in.local_size); in.smem_bytes = src->smem; in.lmem_bytes = src->lmem;
@@ -249,13 +251,13 @@ static void vstage_build(VStage *v, const SSrc *src) {
                 v->key[0] &= v->dep; v->key[1] &= v->dep; v->key[2] &= v->tex_units; v->key[3] &= v->tex_units;
                 v->h = fnv(fnv(v->hb, v->key, 16), &v->fo, 4);
                 memset(&r, 0, sizeof r);
-                r.magic = STAGEREC_MAGIC; r.stage = s; r.code_len = v->code_len; memcpy(r.key, v->key, 16); r.fo = v->fo; r.spv = spv_hash; r.hb = v->hb;
+                r.magic = stagerec_magic(s); r.stage = s; r.code_len = v->code_len; memcpy(r.key, v->key, 16); r.fo = v->fo; r.spv = spv_hash; r.hb = v->hb;
                 r.cbufs = v->cbufs; r.ssbos = v->ssbos; r.ssbo_w = v->ssbo_w; r.images = v->images; r.dep = v->dep; r.tex_units = v->tex_units; r.in_attr = v->in_attr; r.out_attr = v->out_attr;
                 r.uses_alpha = v->uses_alpha; r.nsmp = v->nsmp; memcpy(r.smp, v->smp, sizeof r.smp);
                 snprintf(path, sizeof path, "%s/stage/%d_%016llx.st", vkc_dir(), s, (unsigned long long)v->h);
                 if ((fp = fopen(path, "wb")) != NULL) { fwrite(&r, 1, sizeof r, fp); fclose(fp); }
                 memset(&e, 0, sizeof e);
-                e.magic = STAGEREC_MAGIC; memcpy(e.key, v->key, 16); e.fo = v->fo; e.dep = v->dep; e.tex = v->tex_units; e.vh = v->h;
+                e.magic = stagerec_magic(s); memcpy(e.key, v->key, 16); e.fo = v->fo; e.dep = v->dep; e.tex = v->tex_units; e.vh = v->h;
                 snprintf(path, sizeof path, "%s/stage/%d_%016llx.var", vkc_dir(), s, (unsigned long long)v->hb);
                 if ((fp = fopen(path, "ab")) != NULL) { fwrite(&e, 1, sizeof e, fp); fclose(fp); }
             }
@@ -353,7 +355,7 @@ static VkBlendFactor blend_factor(unsigned f) {
 static VkBlendOp blend_op(unsigned e) { static const uint8_t m[6] = {VK_BLEND_OP_ADD, VK_BLEND_OP_ADD, VK_BLEND_OP_SUBTRACT, VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_MIN, VK_BLEND_OP_MAX}; return (VkBlendOp)m[e < 6 ? e : 1]; }
 static void layout_bindings(VStage *v, int s, VkDescriptorSetLayoutBinding *b0, int *n0, VkDescriptorSetLayoutBinding *b1, int *n1) {
     VkFlags sf = s ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_VERTEX_BIT;
-    for (unsigned n = 1; n < 18; n++) if (v->cbufs >> n & 1) { VkDescriptorSetLayoutBinding b = {40u * (unsigned)s + n, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, sf, NULL}; b0[(*n0)++] = b; }
+    for (unsigned n = 1; n < 18; n++) if (v->cbufs >> n & 1) { VkDescriptorSetLayoutBinding b = {40u * (unsigned)s + n, CB_DESC, 1, sf, NULL}; b0[(*n0)++] = b; }
     for (unsigned k = 0; k < 16; k++) if (v->ssbos >> k & 1) { VkDescriptorSetLayoutBinding b = {40u * (unsigned)s + 20 + k, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, sf, NULL}; b0[(*n0)++] = b; }
     for (int i = 0; i < v->nsmp; i++) { VkDescriptorSetLayoutBinding b = {v->smp[i].binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, sf, NULL}; b1[(*n1)++] = b; }
 }
@@ -566,7 +568,7 @@ static void gpl_universal(void) {
         int n0 = 0, n1 = 0;
         for (unsigned s = 0; s < 2; s++) {
             VkFlags sf = s ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_VERTEX_BIT;
-            for (unsigned n = 1; n < 18; n++) { VkDescriptorSetLayoutBinding b = {40u * s + n, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, sf, NULL}; b0[n0++] = b; }
+            for (unsigned n = 1; n < 18; n++) { VkDescriptorSetLayoutBinding b = {40u * s + n, CB_DESC, 1, sf, NULL}; b0[n0++] = b; }
             for (unsigned k = 0; k < 16; k++) { VkDescriptorSetLayoutBinding b = {40u * s + 20 + k, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, sf, NULL}; b0[n0++] = b; }
             for (unsigned u = 0; u < 32; u++) { VkDescriptorSetLayoutBinding b = {40u * s + u, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, sf, NULL}; b1[n1++] = b; b.binding += 240; b1[n1++] = b; }
         }
@@ -1234,7 +1236,7 @@ static void variants_known(const SSrc *src, uint64_t hb) {
     n = (int)fread(e, sizeof e[0], 32, fp);
     fclose(fp);
     for (int i = 0; i < n; i++) {
-        if (e[i].magic != STAGEREC_MAGIC || !(e[i].key[0] | e[i].key[1] | e[i].key[2] | e[i].key[3] | e[i].fo)) continue;
+        if (e[i].magic != stagerec_magic(src->stage) || !(e[i].key[0] | e[i].key[1] | e[i].key[2] | e[i].key[3] | e[i].fo)) continue;
         stage_ensure(src, hb, e[i].key, e[i].fo, &how);
         if (how == 1) { InterlockedIncrement64(&g_w_stages); InterlockedIncrement64(&g_var_known); }
     }
@@ -2565,6 +2567,7 @@ static void prep_start(void) {
 #define VK_KEYS_VERSION 1
     char kv[16] = "";
     if (VK_KEYS_VERSION > 1) snprintf(kv, sizeof kv, "_k%d", VK_KEYS_VERSION);
+    if (cb_ubo()) strcat(kv, "_u1");              /* the stages with uniform blocks (cb_ubo) are other stage libraries */
     snprintf(g_prep_marker, sizeof g_prep_marker, "%s/prepared_v%u%s_s%d_%s_%04x_%04x_%08x.txt", vkc_dir(), MX_VK_VERSION, kv, RS_ON ? 1 : 0, D.has_gpl && gpl_sep() ? "lib" : D.has_vids ? "nolib" : "novi" /* a pass without libraries (SSBU_VK_PREP=1, run s10n0) must not make a later run with libraries skip theirs */, (unsigned)V.props.vendorID, (unsigned)V.props.deviceID, (unsigned)V.props.driverVersion);
     if (on && GetFileAttributesA(g_prep_marker) != INVALID_FILE_ATTRIBUTES && !(e && atoi(e) == 2)) {
         /* 2026-10-16, the owner's order ("all of them during the white screen at the start, with a small loading screen"):

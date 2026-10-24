@@ -66,6 +66,10 @@ typedef struct {
      * per real pixel of the pass, 1.0 on a target that is not scaled), and the coordinates of a texelFetch from a 2D sampler
      * are mapped from the game's texel grid (the size table in c2) to the image's real one (textureSize). */
     int screen_scale;
+    /* 2026-10-24 (target 1, vertex and fragment stages): 1 = the constant buffers are uniform blocks of scalar layout
+     * (GL_EXT_scalar_block_layout, uint c<n>[16384]) instead of read-only storage buffers: on Intel a uniform block read at a
+     * constant offset is pushed into registers, a storage buffer read goes through memory. The reads are the same text. */
+    int cb_ubo;
 } MxIn;
 
 typedef struct {
