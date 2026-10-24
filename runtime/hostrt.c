@@ -33,6 +33,7 @@ static const uint64_t g_code_13_0_5[][2] = {         /* 13.0.4 -> 13.0.5 offsets
     {0x138534, 0x138534},       /* clock read return address (nnsdk.c, fixed seed) */
     {0x2c55e0, 0x2c55e0},       /* nninitStartup */
     {0x2c5620, 0x2c5620},       /* nnMain */
+    {0x4ec800, 0x4ec800},       /* camera update (aspect.c); 1,692 words, differing only in adrp and the calls into libm */
     {0x653240, 0x653240},       /* entry set-up (debug_mode.c) */
     {0x147f330, 0x147f330},     /* path formatter (newmodule_host.c) */
     {0x1519430, 0x1519430},     /* hook self-test function (hook_host.c) */
